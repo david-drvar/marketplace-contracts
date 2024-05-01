@@ -26,6 +26,7 @@ contract Marketplace {
     mapping(address => mapping(uint256 => Item)) private items; //mapping seller address to mapping of id to Item
 
     event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
+    event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
     event ItemBought(uint256 indexed id, address indexed seller, address indexed buyer);
     event ItemDeleted(uint256 indexed id, address indexed seller);
 
@@ -70,6 +71,24 @@ contract Marketplace {
         uint256 id = createHash(itemCount, msg.sender);
         items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes);
         emit ItemListed(id, msg.sender, _title, _description, _price, photosIPFSHashes);
+    }
+
+    function updateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes) 
+        belongsToSeller(msg.sender, id) isListed(msg.sender, id) external {
+        if (_price <= 0) {
+            revert PriceMustBeAboveZero();
+        }
+        if (photosIPFSHashes.length > MAX_PHOTO_LIMIT) {
+            revert PhotoLimitExceeded(msg.sender, _title);
+        }
+        for (uint i = 0; i < photosIPFSHashes.length; i++) {
+            if (!isIPFSHash(photosIPFSHashes[i])) {
+                revert NotIPFSHash(photosIPFSHashes[i]);
+            }
+        }
+        
+        items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes);
+        emit ItemUpdated(id, msg.sender, _title, _description, _price, photosIPFSHashes);
     }
 
     function isIPFSHash(string memory hash) private pure returns (bool) {
