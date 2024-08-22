@@ -28,6 +28,13 @@ contract Users {
     mapping(string => bool) private usernameExists;
 
 
+    event UserRegistered(address indexed userAddress, string indexed username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator);
+    event UserUpdated(address indexed userAddress, string indexed username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator);
+    event UserDeleted(address indexed userAddress, string indexed username);
+
+
     modifier userMustExist(address userAddress) {
         if (!userProfiles[userAddress].exists) {
             revert UserDoesNotExist(userAddress);
@@ -66,6 +73,8 @@ contract Users {
             exists: true
         });
         usernameExists[_username] = true;
+
+        emit UserRegistered(msg.sender, _username, _firstName, _lastName, _country, _description, _email, _avatarHash, _isModerator);
     }
 
     function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
@@ -93,6 +102,8 @@ contract Users {
             isModerator: _isModerator,
             exists: true
         });
+
+        emit UserUpdated(msg.sender, _username, _firstName, _lastName, _country, _description, _email, _avatarHash, _isModerator);
     }
 
     function deleteProfile() userMustExist(msg.sender) external {
@@ -102,6 +113,8 @@ contract Users {
 
         delete userProfiles[msg.sender];
         delete usernameExists[user.username];
+
+        emit UserDeleted(msg.sender, user.username);
     }
 
     function isRegisteredUser(address _user) external view returns (bool) {
