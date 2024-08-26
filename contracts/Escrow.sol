@@ -66,18 +66,21 @@ contract Escrow is Ownable {
         bool sellerApproved;
         bool moderatorApproved;
         bool disputed;
+        address disputedBy;
         bool isCompleted;
         uint256 creationTime;
     }
 
     IMarketplace public marketplaceContract;
 
-    mapping(uint256 => Transaction) private transactions;
+    mapping(uint256 => Transaction) private transactions; // item id to transaction mapping -> 1:1 itemId Transaction
 
-    event TransactionCreated(uint256 itemId, address buyer, address seller, uint256 price);
-    event TransactionApproved(uint256 itemId, address approver);
-    event TransactionCompleted(uint256 itemId);
-    event TransactionDisputed(uint256 itemId);
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, 
+        TransactionStatus transactionStatus, bool buyerApproved, bool sellerApproved, bool moderatorApproved, bool disputed, address disputedBy,
+        bool isCompleted, uint256 creationTime);
+    event TransactionApproved(uint256 indexed itemId, address approver);
+    event TransactionCompleted(uint256 indexed itemId);
+    event TransactionDisputed(uint256 indexed itemId, address disputer);
 
     modifier txExists(uint256 id) {
         Transaction memory item = transactions[id];
@@ -147,11 +150,12 @@ contract Escrow is Ownable {
             sellerApproved: false,
             moderatorApproved: false,
             disputed: false,
+            disputedBy: address(0),
             isCompleted: false,
             creationTime: block.timestamp
         });
 
-        emit TransactionCreated(_itemId, _buyer, _seller, _price);
+        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, TransactionStatus.FUNDED, false, false, false, false, address(0), false, block.timestamp);
     }
 
     function approveByBuyer(uint256 _itemId) external {
@@ -187,13 +191,14 @@ contract Escrow is Ownable {
         finalizeTransaction(_itemId);
     }
 
-    function raiseDispute(uint256 _itemId) external {
+    function raiseDispute(uint256 _itemId, address disputer) external {
         Transaction storage transaction = transactions[_itemId];
         require(msg.sender == transaction.buyer || msg.sender == transaction.seller, "Only buyer or seller can raise a dispute");
         require(!transaction.isCompleted, "Transaction is already completed");
 
         transaction.disputed = true;
-        emit TransactionDisputed(_itemId);
+        transaction.disputedBy = disputer;
+        emit TransactionDisputed(_itemId, disputer);
     }
 
     function finalizeTransaction(uint256 _itemId) internal {
