@@ -3,7 +3,13 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+
 interface IMarketplace {
+    enum ItemStatus {
+        LISTED,
+        BOUGHT,
+        DELETED
+    }
 
     struct Item {
         uint256 id;
@@ -12,9 +18,8 @@ interface IMarketplace {
         string description;
         string title;
         string[] photosIPFSHashes;
+        ItemStatus itemStatus;
     }
-
-    function MAX_PHOTO_LIMIT() external pure returns (uint8);
 
     event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
     event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
@@ -22,24 +27,23 @@ interface IMarketplace {
     event ItemDeleted(uint256 indexed id, address indexed seller);
 
     function setUsersContractAddress(address _usersContractAddress) external;
-
     function setEscrowContractAddress(address _escrowContractAddress) external;
-
     function listNewItem(string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes) external;
-
     function updateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes) external;
-
     function deleteItem(uint256 id) external;
-
     function buyItem(address sellerAddress, uint256 id, address _moderator) external payable;
-
     function getItemCount() external view returns (uint256);
 }
 
 
-
+error OnlyModerator();
+error OnlySeller();
+error OnlyBuyer();
+error OnlyBuyerOrSeller();
+error TxCantBeCompleted();
+error ValueDistributionNotCorrect();
 error TxExists(uint256 id);
-error OnlyMarketplaceContractCallCall();
+error OnlyMarketplaceContractCanCall();
 
 
 contract Escrow is Ownable {
@@ -61,12 +65,13 @@ contract Escrow is Ownable {
         address moderator;
         address buyer;
         uint256 price;
+        uint8 moderatorFee;
         TransactionStatus transactionStatus;
         bool buyerApproved;
         bool sellerApproved;
-        bool moderatorApproved;
         bool disputed;
-        address disputedBy;
+        address disputedBySeller;
+        address disputedByBuyer;
         bool isCompleted;
         uint256 creationTime;
     }
@@ -75,7 +80,7 @@ contract Escrow is Ownable {
 
     mapping(uint256 => Transaction) private transactions; // item id to transaction mapping -> 1:1 itemId Transaction
 
-    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, 
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, uint8 moderatorFee, 
         TransactionStatus transactionStatus, bool buyerApproved, bool sellerApproved, bool moderatorApproved, bool disputed, address disputedBy,
         bool isCompleted, uint256 creationTime);
     event TransactionApproved(uint256 indexed itemId, address approver);
@@ -92,38 +97,10 @@ contract Escrow is Ownable {
 
     modifier onlyMarketplaceCanCall() {
         if (msg.sender != address(marketplaceContract)) {
-            revert OnlyMarketplaceContractCallCall();
+            revert OnlyMarketplaceContractCanCall();
         }
         _;
     }
-
-    /**
-     * Proces - seller, buyer, moderator
-     * 
-     * 1.
-     * buyer kupi i funduje tx
-     * seller shippuje item time ga approvovajuci
-     * buyer dobija proizvod i approvuje
-     * funds se salje na adresu sellera bez potrebe moderatora
-     * 
-     * 2.
-     * buyer kupi i funduje tx
-     * seller shippuje item tima ga approvovajuci
-     * buyer dobija proizvod (ili ne dobija) i fajluje dispute
-     * moderator se ukljucuje i trazi dokaze
-     * nema veze vise tu ko je acceptovao (seller ili buyer) ili ne
-     * moderator sam odlucuje sta ce da radi i kako ce da razdeli novac (kome i koliko procenata)
-     * 
-     * 3.
-     * buyer dobija proizvoda i approvuje
-     * seller medjutim nije approvovao (zaboravio)
-     * moderator se ukljucuje
-     * seller se i dalje ne javlja, i moderator odlucuje sta ce da radi
-     * 
-     * 4.
-     * 
-     * 
-     */
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -131,12 +108,55 @@ contract Escrow is Ownable {
         marketplaceContract = IMarketplace(_marketplaceContractAddress);
     }
 
+    modifier onlyModerator(uint256 itemId) {
+        if (msg.sender != transactions[itemId].moderator) {
+            revert OnlyModerator();
+        }
+        _;
+    }
+
+    modifier onlySeller(uint256 itemId) {
+        if (msg.sender != transactions[itemId].seller) {
+            revert OnlySeller();
+        }
+        _;
+    }
+
+    modifier onlyBuyer(uint256 itemId) {
+        if (msg.sender != transactions[itemId].buyer) {
+            revert OnlyBuyer();
+        }
+        _;
+    }
+
+    modifier onlyBuyerOrSeller(uint256 itemId) {
+        if (msg.sender != transactions[itemId].seller && msg.sender != transactions[itemId].buyer) {
+            revert OnlyBuyerOrSeller();
+        }
+        _;
+    }
+
+    modifier notCompleted(uint256 itemId) {
+        if (transactions[itemId].isCompleted) {
+            revert TxCantBeCompleted();
+        }
+        _;
+    }
+
+    modifier correctValueDistribution(uint256 itemId, uint8 percentageSeller, uint8 percentageBuyer) {
+        if (transactions[itemId].moderatorFee + percentageSeller + percentageBuyer != 100) {
+            revert ValueDistributionNotCorrect();
+        }
+        _;
+    }
+
     function createTransaction(
         uint256 _itemId,
         address _seller,
         address _buyer,
         address _moderator,
-        uint256 _price
+        uint256 _price,
+        uint8 _moderatorFee
     ) txExists(_itemId) onlyMarketplaceCanCall() external payable {
 
         transactions[_itemId] = Transaction({
@@ -145,76 +165,104 @@ contract Escrow is Ownable {
             buyer: _buyer,
             moderator: _moderator,
             price: _price,
+            moderatorFee: _moderatorFee,
             transactionStatus: TransactionStatus.FUNDED,
             buyerApproved: false,
             sellerApproved: false,
-            moderatorApproved: false,
             disputed: false,
-            disputedBy: address(0),
+            disputedBySeller: address(0),
+            disputedByBuyer: address(0),
             isCompleted: false,
             creationTime: block.timestamp
         });
 
-        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, TransactionStatus.FUNDED, false, false, false, false, address(0), false, block.timestamp);
+        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _moderatorFee, TransactionStatus.FUNDED, false, false, false, false, address(0), false, block.timestamp);
     }
 
-    function approveByBuyer(uint256 _itemId) external {
-        Transaction storage transaction = transactions[_itemId];
-        require(msg.sender == transaction.buyer, "Only buyer can approve");
-        require(!transaction.isCompleted, "Transaction is already completed");
+    function approveByBuyer(uint256 _itemId) external 
+        onlyBuyer(_itemId) 
+        notCompleted(_itemId) {
 
+        Transaction storage transaction = transactions[_itemId];
         transaction.buyerApproved = true;
         emit TransactionApproved(_itemId, msg.sender);
 
         finalizeTransaction(_itemId);
     }
 
-    function approveBySeller(uint256 _itemId) external {
-        Transaction storage transaction = transactions[_itemId];
-        require(msg.sender == transaction.seller, "Only seller can approve");
-        require(!transaction.isCompleted, "Transaction is already completed");
+    function approveBySeller(uint256 _itemId) external 
+        onlySeller(_itemId) 
+        notCompleted(_itemId) {
 
+        Transaction storage transaction = transactions[_itemId];
         transaction.sellerApproved = true;
         emit TransactionApproved(_itemId, msg.sender);
 
         finalizeTransaction(_itemId);
     }
 
-    function approveByModerator(uint256 _itemId) external {
+    function raiseDispute(uint256 _itemId, address disputer) external 
+        onlyBuyerOrSeller(_itemId) 
+        notCompleted(_itemId) {
+
         Transaction storage transaction = transactions[_itemId];
-        require(msg.sender == transaction.moderator, "Only moderator can approve");
-        require(!transaction.isCompleted, "Transaction is already completed");
-
-        transaction.moderatorApproved = true;
-        emit TransactionApproved(_itemId, msg.sender);
-
-        finalizeTransaction(_itemId);
-    }
-
-    function raiseDispute(uint256 _itemId, address disputer) external {
-        Transaction storage transaction = transactions[_itemId];
-        require(msg.sender == transaction.buyer || msg.sender == transaction.seller, "Only buyer or seller can raise a dispute");
-        require(!transaction.isCompleted, "Transaction is already completed");
-
         transaction.disputed = true;
-        transaction.disputedBy = disputer;
+        if (msg.sender == transaction.seller) 
+            transaction.disputedBySeller = disputer;
+        else 
+            transaction.disputedByBuyer = disputer;
+
         emit TransactionDisputed(_itemId, disputer);
     }
 
     function finalizeTransaction(uint256 _itemId) internal {
         Transaction storage transaction = transactions[_itemId];
 
-        if (transaction.buyerApproved && transaction.sellerApproved && (transaction.moderatorApproved || !transaction.disputed)) {
+        if (transaction.buyerApproved && transaction.sellerApproved) {
             transaction.isCompleted = true;
 
-            // Transfer funds to the seller
-            (bool success, ) = transaction.seller.call{value: transaction.price}(""); 
-            //todo change - not always the seller gets the money
-            //also moderator gets their fee
+            uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
+            uint256 sellerAmount = transaction.price - moderatorFeeAmount;
 
-            //tell marketplaace to finish with the product
+            // Transfer to moderator their cut
+            (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
+            require(successModerator, "Transfer to moderator failed");
+
+            // Transfer remaining amount to seller
+            (bool successSeller, ) = transaction.seller.call{value: sellerAmount}(""); 
+            require(successSeller, "Transfer to seller failed");
+
+
+            //should I inform marketplace to finish with the product ???
             
-            require(success, "Transfer to seller failed");
+            emit TransactionCompleted(_itemId);
+        }
+    }
+
+
+    function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable 
+        onlyModerator(_itemId)
+        notCompleted(_itemId) 
+        correctValueDistribution(_itemId, percentageBuyer, percentageSeller) {
+
+        Transaction storage transaction = transactions[_itemId];
+
+        if (transaction.disputed) {
+            transaction.isCompleted = true;
+
+            uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
+            uint256 remainingAmount = transaction.price - moderatorFeeAmount;
+            uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
+            uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
+
+            (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
+            require(successModerator, "Transfer to moderator failed");
+
+            (bool successSeller, ) = transaction.seller.call{value: sellerAmount}("");
+            require(successSeller, "Transfer to seller failed");
+
+            (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
+            require(successBuyer, "Transfer to buyer failed");
 
             emit TransactionCompleted(_itemId);
         }

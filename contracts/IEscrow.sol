@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-interface IEscrow {
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IMarketplace.sol";
 
+interface IEscrow {
     struct Moderator {
         address moderator;
         uint256 fee;
@@ -20,25 +22,25 @@ interface IEscrow {
         address moderator;
         address buyer;
         uint256 price;
+        uint8 moderatorFee;
         TransactionStatus transactionStatus;
         bool buyerApproved;
         bool sellerApproved;
-        bool moderatorApproved;
         bool disputed;
+        address disputedBySeller;
+        address disputedByBuyer;
         bool isCompleted;
         uint256 creationTime;
     }
 
-    // Getter for the marketplaceContract
-    function marketplaceContract() external view returns (address);
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, uint8 moderatorFee,
+        TransactionStatus transactionStatus, bool buyerApproved, bool sellerApproved, bool moderatorApproved, bool disputed, address disputedBy,
+        bool isCompleted, uint256 creationTime);
 
-    // Events
-    event TransactionCreated(uint256 itemId, address buyer, address seller, uint256 price);
-    event TransactionApproved(uint256 itemId, address approver);
-    event TransactionCompleted(uint256 itemId);
-    event TransactionDisputed(uint256 itemId);
+    event TransactionApproved(uint256 indexed itemId, address approver);
+    event TransactionCompleted(uint256 indexed itemId);
+    event TransactionDisputed(uint256 indexed itemId, address disputer);
 
-    // Functions
     function setMarketplaceContractAddress(address _marketplaceContractAddress) external;
 
     function createTransaction(
@@ -46,14 +48,33 @@ interface IEscrow {
         address _seller,
         address _buyer,
         address _moderator,
-        uint256 _price
+        uint256 _price,
+        uint8 _moderatorFee
     ) external payable;
 
     function approveByBuyer(uint256 _itemId) external;
 
     function approveBySeller(uint256 _itemId) external;
 
-    function approveByModerator(uint256 _itemId) external;
+    function raiseDispute(uint256 _itemId, address disputer) external;
 
-    function raiseDispute(uint256 _itemId) external;
+    function finalizeTransaction(uint256 _itemId) external;
+
+    function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable;
+
+    function transactions(uint256 _itemId) external view returns (
+        address seller,
+        address moderator,
+        address buyer,
+        uint256 price,
+        uint8 moderatorFee,
+        TransactionStatus transactionStatus,
+        bool buyerApproved,
+        bool sellerApproved,
+        bool disputed,
+        address disputedBySeller,
+        address disputedByBuyer,
+        bool isCompleted,
+        uint256 creationTime
+    );
 }
