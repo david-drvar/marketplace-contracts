@@ -161,10 +161,7 @@ contract Marketplace is Ownable {
     IEscrow public escrowContract;
     IUsers public usersContract;
 
-    constructor(address initialOwner, address _escrowContractAddress, address _usersContractAddress) Ownable(initialOwner) {
-        escrowContract = IEscrow(_escrowContractAddress);
-        usersContract = IUsers(_usersContractAddress);
-    }
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
 
     modifier isListed(address sellerAddress, uint256 id) {
