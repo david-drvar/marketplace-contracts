@@ -27,16 +27,16 @@ module.exports = {
   },
   etherscan: {
     apiKey: ETHERSCAN_API_KEY,
-    customChains: [
-      {
-        network: "sepolia",
-        chainId: 11155111,
-        urls: {
-          apiURL: "https://eth-sepolia.blockscout.com/api",
-          browserURL: "https://eth-sepolia.blockscout.com",
-        },
-      },
-    ],
+    // customChains: [
+    //   {
+    //     network: "sepolia",
+    //     chainId: 11155111,
+    //     urls: {
+    //       apiURL: "https://eth-sepolia.blockscout.com/api",
+    //       browserURL: "https://eth-sepolia.blockscout.com",
+    //     },
+    //   },
+    // ],
   },
   sourcify: {
     enabled: true,
