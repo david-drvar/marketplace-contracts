@@ -4,9 +4,8 @@ require("dotenv").config();
 const fs = require("fs");
 const marketplaceAbiSource = require("../artifacts/contracts/Marketplace.sol/Marketplace.json");
 const usersAbiSource = require("../artifacts/contracts/Users.sol/Users.json");
+const escrowAbiSource = require("../artifacts/contracts/Escrow.sol/Escrow.json");
 const deployedAddresses = require("../ignition/deployments/chain-11155111/deployed_addresses.json");
-
-const contractAddress = "0xB4b7589073025f14057fe0d07616eC0e9ca99B50"; // sepolia contract address
 
 async function main() {
   if (process.env.UPDATE_FRONT_END) {
@@ -20,15 +19,17 @@ async function main() {
 async function updateAbi() {
   fs.writeFileSync(`${frontEndAbiLocation}Marketplace.json`, JSON.stringify(marketplaceAbiSource["abi"]));
   fs.writeFileSync(`${frontEndAbiLocation}Users.json`, JSON.stringify(usersAbiSource["abi"]));
+  fs.writeFileSync(`${frontEndAbiLocation}Escrow.json`, JSON.stringify(escrowAbiSource["abi"]));
 }
 
 async function updateContractAddresses() {
   const sepolia_chainId = 11155111;
   const marketplaceContractAddress = deployedAddresses["MarketplaceModule#Marketplace"];
   const usersContractAddress = deployedAddresses["UsersModule#Users"];
+  const escrowContractAddress = deployedAddresses["EscrowModule#Escrow"];
   const contractAddresses = JSON.parse(fs.readFileSync(frontEndContractsFile, "utf8"));
 
-  contractAddresses[sepolia_chainId] = { Marketplace: [marketplaceContractAddress], Users: [usersContractAddress] };
+  contractAddresses[sepolia_chainId] = { Marketplace: [marketplaceContractAddress], Users: [usersContractAddress], Escrow: [escrowContractAddress] };
 
   fs.writeFileSync(frontEndContractsFile, JSON.stringify(contractAddresses));
 }
