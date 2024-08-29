@@ -3,18 +3,9 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-error PriceMustBeAboveZero();
-error ItemNotListed(address sellerAddress, uint256 id);
-error ItemNotBelongsToSeller(address sellerAddress, uint256 id);
-error SellerCannotBuyItsItem(address sellerAddress);
-error SentValueDifferentThanItemPrice(address sellerAddress, uint256 id, uint256 value);
-error PhotoLimitExceeded();
-error NotIPFSHash(string hash);
-error MustBeModerator(address moderator);
 
 
 interface IUsers {
-
     struct UserProfile {
         address userAddress;
         string username;
@@ -26,77 +17,33 @@ interface IUsers {
         string avatarHash;
         bool isModerator;
         bool exists;
-        uint256 moderatorFee;
+        uint8 moderatorFee;
     }
 
-    // Events
-    event UserRegistered(
-        address indexed userAddress, 
-        string indexed username, 
-        string firstName,
-        string lastName, 
-        string country, 
-        string description, 
-        string email, 
-        string avatarHash, 
-        bool isModerator, 
-        uint8 moderatorFee
-    );
-    
-    event UserUpdated(
-        address indexed userAddress, 
-        string indexed username, 
-        string firstName,
-        string lastName, 
-        string country, 
-        string description, 
-        string email, 
-        string avatarHash, 
-        bool isModerator, 
-        uint8 moderatorFee
-    );
-    
+    event UserRegistered(address indexed userAddress, string indexed username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
+    event UserUpdated(address indexed userAddress, string indexed username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
     event UserDeleted(address indexed userAddress, string indexed username);
 
-    // Functions
-    function createProfile(
-        string memory _username,
-        string memory _firstName,
-        string memory _lastName,
-        string memory _country,
-        string memory _description,
-        string memory _email,
-        string memory _avatarHash,
-        bool _isModerator,
-        uint8 _moderatorFee
-    ) external;
-
-    function updateProfile(
-        string memory _username,
-        string memory _firstName,
-        string memory _lastName,
-        string memory _country,
-        string memory _description,
-        string memory _email,
-        string memory _avatarHash,
-        bool _isModerator,
-        uint8 _moderatorFee
-    ) external;
-
+    function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
+        string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
+    
+    function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
+        string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
+    
     function deleteProfile() external;
-
+    
     function isRegisteredUser(address _user) external view returns (bool);
-
+    
     function isModerator(address _user) external view returns (bool);
-
+    
     function getProfile(address _user) external view returns (UserProfile memory);
 }
 
 
 
-
 interface IEscrow {
-
     struct Moderator {
         address moderator;
         uint256 fee;
@@ -114,25 +61,25 @@ interface IEscrow {
         address moderator;
         address buyer;
         uint256 price;
+        uint8 moderatorFee;
         TransactionStatus transactionStatus;
         bool buyerApproved;
         bool sellerApproved;
-        bool moderatorApproved;
         bool disputed;
+        address disputedBySeller;
+        address disputedByBuyer;
         bool isCompleted;
         uint256 creationTime;
     }
 
-    // Getter for the marketplaceContract
-    function marketplaceContract() external view returns (address);
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, uint8 moderatorFee,
+        TransactionStatus transactionStatus, bool buyerApproved, bool sellerApproved, bool moderatorApproved, bool disputed, address disputedBy,
+        bool isCompleted, uint256 creationTime);
 
-    // Events
-    event TransactionCreated(uint256 itemId, address buyer, address seller, uint256 price);
-    event TransactionApproved(uint256 itemId, address approver);
-    event TransactionCompleted(uint256 itemId);
-    event TransactionDisputed(uint256 itemId);
+    event TransactionApproved(uint256 indexed itemId, address approver);
+    event TransactionCompleted(uint256 indexed itemId);
+    event TransactionDisputed(uint256 indexed itemId, address disputer);
 
-    // Functions
     function setMarketplaceContractAddress(address _marketplaceContractAddress) external;
 
     function createTransaction(
@@ -140,19 +87,47 @@ interface IEscrow {
         address _seller,
         address _buyer,
         address _moderator,
-        uint256 _price
+        uint256 _price,
+        uint8 _moderatorFee
     ) external payable;
 
     function approveByBuyer(uint256 _itemId) external;
 
     function approveBySeller(uint256 _itemId) external;
 
-    function approveByModerator(uint256 _itemId) external;
+    function raiseDispute(uint256 _itemId, address disputer) external;
 
-    function raiseDispute(uint256 _itemId) external;
+    function finalizeTransaction(uint256 _itemId) external;
+
+    function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable;
+
+    function transactions(uint256 _itemId) external view returns (
+        address seller,
+        address moderator,
+        address buyer,
+        uint256 price,
+        uint8 moderatorFee,
+        TransactionStatus transactionStatus,
+        bool buyerApproved,
+        bool sellerApproved,
+        bool disputed,
+        address disputedBySeller,
+        address disputedByBuyer,
+        bool isCompleted,
+        uint256 creationTime
+    );
 }
 
 
+error PriceMustBeAboveZero();
+error ItemNotListed(address sellerAddress, uint256 id);
+error ItemNotBelongsToSeller(address sellerAddress, uint256 id);
+error SellerCannotBuyItsItem(address sellerAddress);
+error SentValueDifferentThanItemPrice(address sellerAddress, uint256 id, uint256 value);
+error PhotoLimitExceeded();
+error NotIPFSHash(string hash);
+error MustBeModerator(address moderator);
+error ModeratorCantBeBuyerOrSeller();
 
 
 contract Marketplace is Ownable {
@@ -246,6 +221,13 @@ contract Marketplace is Ownable {
         _;
     }
 
+    modifier moderatorCantBeBuyerOrSeller(address _moderator, address sellerAddress) {
+        if (_moderator == sellerAddress || _moderator == msg.sender) {
+            revert ModeratorCantBeBuyerOrSeller();
+        }
+        _;
+    }
+
     function setUsersContractAddress(address _usersContractAddress) external 
         onlyOwner {
         usersContract = IUsers(_usersContractAddress);
@@ -326,11 +308,14 @@ contract Marketplace is Ownable {
         mustBeModerator(_moderator) 
         correctAmountSent(sellerAddress, id) {
 
-        finalizeBuyItem(sellerAddress, id, _moderator); //had to move because stack was too deep
+        uint8 moderatorFee = usersContract.getProfile(_moderator).moderatorFee;
+        finalizeBuyItem(sellerAddress, id, _moderator, moderatorFee); //had to move because stack was too deep
     }
 
-    function finalizeBuyItem(address sellerAddress, uint256 id, address _moderator) private {
-        try escrowContract.createTransaction{value: msg.value}(id, sellerAddress, msg.sender,_moderator,items[sellerAddress][id].price) {
+    function finalizeBuyItem(address sellerAddress, uint256 id, address _moderator, uint8 moderatorFee) private 
+        moderatorCantBeBuyerOrSeller(_moderator, sellerAddress){
+            
+        try escrowContract.createTransaction{value: msg.value}(id, sellerAddress, msg.sender,_moderator,items[sellerAddress][id].price, moderatorFee) {
             items[sellerAddress][id].itemStatus = ItemStatus.BOUGHT;
             emit ItemBought(id, sellerAddress, msg.sender);
         }

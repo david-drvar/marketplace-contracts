@@ -7,6 +7,7 @@ error UserAlreadyExists(address userAddress);
 error UserDoesNotExist(address userAddress);
 error UsernameExists(string username);
 error NotIPFSHash(string hashString);
+error ModeratorFeeLimitsNotRespected(uint8 moderatorFee);
 
 
 contract Users is Ownable{
@@ -24,13 +25,14 @@ contract Users is Ownable{
         string avatarHash;
         bool isModerator;
         bool exists;
-        uint256 moderatorFee;
+        uint8 moderatorFee;
     }
 
     mapping(address => UserProfile) public userProfiles;
 
     mapping(string => bool) private usernameExists;
 
+    uint8 constant public MAX_MODERATOR_FEE = 20;
 
     event UserRegistered(address indexed userAddress, string indexed username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
@@ -69,6 +71,9 @@ contract Users is Ownable{
             fee = 0;
         }
         else {
+            if (_moderatorFee < 0 || _moderatorFee > MAX_MODERATOR_FEE)
+                revert ModeratorFeeLimitsNotRespected(_moderatorFee);
+                
             fee = _moderatorFee;
         }
 
