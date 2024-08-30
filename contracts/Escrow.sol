@@ -44,6 +44,7 @@ error TxCantBeCompleted();
 error ValueDistributionNotCorrect();
 error TxExists(uint256 id);
 error OnlyMarketplaceContractCanCall();
+error MustBeDisputed();
 
 
 contract Escrow is Ownable {
@@ -85,6 +86,7 @@ contract Escrow is Ownable {
         bool isCompleted, uint256 creationTime);
     event TransactionApproved(uint256 indexed itemId, address approver);
     event TransactionCompleted(uint256 indexed itemId);
+    event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage, uint8 moderatorFee);
     event TransactionDisputed(uint256 indexed itemId, address disputer);
 
     modifier txExists(uint256 id) {
@@ -146,6 +148,13 @@ contract Escrow is Ownable {
     modifier correctValueDistribution(uint256 itemId, uint8 percentageSeller, uint8 percentageBuyer) {
         if (transactions[itemId].moderatorFee + percentageSeller + percentageBuyer != 100) {
             revert ValueDistributionNotCorrect();
+        }
+        _;
+    }
+
+    modifier mustBeDisputed(uint256 itemId) {
+        if (!transactions[itemId].disputed) {
+            revert MustBeDisputed();
         }
         _;
     }
@@ -243,29 +252,32 @@ contract Escrow is Ownable {
     function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable 
         onlyModerator(_itemId)
         notCompleted(_itemId) 
-        correctValueDistribution(_itemId, percentageBuyer, percentageSeller) {
+        correctValueDistribution(_itemId, percentageBuyer, percentageSeller) 
+        mustBeDisputed(_itemId) {
 
+        finalizePaymentsByModerator(_itemId, percentageSeller, percentageBuyer);
+    }
+
+    function finalizePaymentsByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) internal {
         Transaction storage transaction = transactions[_itemId];
 
-        if (transaction.disputed) {
-            transaction.isCompleted = true;
+        transaction.isCompleted = true;
 
-            uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
-            uint256 remainingAmount = transaction.price - moderatorFeeAmount;
-            uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
-            uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
+        uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
+        uint256 remainingAmount = transaction.price - moderatorFeeAmount;
+        uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
+        uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
 
-            (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
-            require(successModerator, "Transfer to moderator failed");
+        (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
+        require(successModerator, "Transfer to moderator failed");
 
-            (bool successSeller, ) = transaction.seller.call{value: sellerAmount}("");
-            require(successSeller, "Transfer to seller failed");
+        (bool successSeller, ) = transaction.seller.call{value: sellerAmount}("");
+        require(successSeller, "Transfer to seller failed");
 
-            (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
-            require(successBuyer, "Transfer to buyer failed");
+        (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
+        require(successBuyer, "Transfer to buyer failed");
 
-            emit TransactionCompleted(_itemId);
-        }
+        emit TransactionCompletedByModerator(_itemId, percentageBuyer, percentageSeller, transaction.moderatorFee);
     }
 
 }
