@@ -54,11 +54,11 @@ contract Escrow is Ownable {
         uint256 fee;
     }
 
-    enum TransactionStatus {
-        FUNDED,
-        SHIPPED,
-        RECEIVED
-    }
+    // enum TransactionStatus {   //DO I NEED THIS??
+    //     FUNDED,
+    //     SHIPPED,
+    //     RECEIVED
+    // }
 
     struct Transaction {
         uint256 itemId;
@@ -67,12 +67,11 @@ contract Escrow is Ownable {
         address buyer;
         uint256 price;
         uint8 moderatorFee;
-        TransactionStatus transactionStatus;
         bool buyerApproved;
         bool sellerApproved;
         bool disputed;
-        address disputedBySeller;
-        address disputedByBuyer;
+        bool disputedBySeller;
+        bool disputedByBuyer;
         bool isCompleted;
         uint256 creationTime;
     }
@@ -81,12 +80,11 @@ contract Escrow is Ownable {
 
     mapping(uint256 => Transaction) private transactions; // item id to transaction mapping -> 1:1 itemId Transaction
 
-    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, address moderator, uint256 price, uint8 moderatorFee, 
-        TransactionStatus transactionStatus, bool buyerApproved, bool sellerApproved, bool moderatorApproved, bool disputed, address disputedBy,
-        bool isCompleted, uint256 creationTime);
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, 
+        address moderator, uint256 price, uint8 moderatorFee, uint256 creationTime);
     event TransactionApproved(uint256 indexed itemId, address approver);
     event TransactionCompleted(uint256 indexed itemId);
-    event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage, uint8 moderatorFee);
+    event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage);
     event TransactionDisputed(uint256 indexed itemId, address disputer);
 
     modifier txExists(uint256 id) {
@@ -175,17 +173,16 @@ contract Escrow is Ownable {
             moderator: _moderator,
             price: _price,
             moderatorFee: _moderatorFee,
-            transactionStatus: TransactionStatus.FUNDED,
             buyerApproved: false,
             sellerApproved: false,
             disputed: false,
-            disputedBySeller: address(0),
-            disputedByBuyer: address(0),
+            disputedBySeller: false,
+            disputedByBuyer: false,
             isCompleted: false,
             creationTime: block.timestamp
         });
 
-        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _moderatorFee, TransactionStatus.FUNDED, false, false, false, false, address(0), false, block.timestamp);
+        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _moderatorFee, block.timestamp);
     }
 
     function approveByBuyer(uint256 _itemId) external 
@@ -217,9 +214,9 @@ contract Escrow is Ownable {
         Transaction storage transaction = transactions[_itemId];
         transaction.disputed = true;
         if (msg.sender == transaction.seller) 
-            transaction.disputedBySeller = disputer;
+            transaction.disputedBySeller = true;
         else 
-            transaction.disputedByBuyer = disputer;
+            transaction.disputedByBuyer = true;
 
         emit TransactionDisputed(_itemId, disputer);
     }
@@ -277,7 +274,7 @@ contract Escrow is Ownable {
         (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
         require(successBuyer, "Transfer to buyer failed");
 
-        emit TransactionCompletedByModerator(_itemId, percentageBuyer, percentageSeller, transaction.moderatorFee);
+        emit TransactionCompletedByModerator(_itemId, percentageBuyer, percentageSeller);
     }
 
 }
