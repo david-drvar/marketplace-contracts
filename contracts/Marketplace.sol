@@ -148,8 +148,10 @@ contract Marketplace is Ownable {
     mapping(address => mapping(uint256 => Item)) private items; //mapping seller address to mapping of id to Item
     mapping(string => string[]) private categories; // mapping category name to list of subcategories
 
-    event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
-    event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
+    event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes, Condition condition,
+        string category, string subcategory, string country, bool isGift);
+    event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes, Condition condition,
+        string category, string subcategory, string country, bool isGift);
     event ItemBought(uint256 indexed id, address indexed seller, address indexed buyer);
     event ItemDeleted(uint256 indexed id, address indexed seller);
 
@@ -309,7 +311,7 @@ contract Marketplace is Ownable {
             _price = 0;
 
         items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes, ItemStatus.LISTED, _condition, _category, _subcategory, _country, _isGift);
-        emit ItemListed(id, msg.sender, _title, _description, _price, photosIPFSHashes);
+        emit ItemListed(id, msg.sender, _title, _description, _price, photosIPFSHashes, _condition, _category, _subcategory, _country, _isGift);
     }
 
     function updateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes,
@@ -350,7 +352,7 @@ contract Marketplace is Ownable {
             _price = 0;
 
         items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes,ItemStatus.LISTED, _condition, _category, _subcategory, _country, _isGift);
-        emit ItemUpdated(id, msg.sender, _title, _description, _price, photosIPFSHashes);
+        emit ItemUpdated(id, msg.sender, _title, _description, _price, photosIPFSHashes, _condition, _category, _subcategory, _country, _isGift);
     }
 
     function isIPFSHash(string memory hash) private pure returns (bool) {
