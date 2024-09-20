@@ -34,11 +34,11 @@ contract Users is Ownable{
 
     uint8 constant public MAX_MODERATOR_FEE = 20;
 
-    event UserRegistered(address indexed userAddress, string indexed username, string firstName,
+    event UserRegistered(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserUpdated(address indexed userAddress, string indexed username, string firstName,
+    event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserDeleted(address indexed userAddress, string indexed username);
+    event UserDeleted(address indexed userAddress, string username);
 
 
     modifier userMustExist(address userAddress) {
