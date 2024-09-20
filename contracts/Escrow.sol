@@ -82,6 +82,8 @@ contract Escrow is Ownable {
 
     event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, 
         address moderator, uint256 price, uint8 moderatorFee, uint256 creationTime);
+    event TransactionCreatedWithoutModerator(uint256 indexed itemId, address indexed buyer, address indexed seller, 
+        uint256 price, uint256 creationTime);
     event TransactionApproved(uint256 indexed itemId, address approver);
     event TransactionCompleted(uint256 indexed itemId);
     event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage);
@@ -185,29 +187,50 @@ contract Escrow is Ownable {
         emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _moderatorFee, block.timestamp);
     }
 
-    function approveByBuyer(uint256 _itemId) external 
-        onlyBuyer(_itemId) 
+    function createTransactionWithoutModerator(
+        uint256 _itemId,
+        address _seller,
+        address _buyer,
+        uint256 _price
+    ) txExists(_itemId) onlyMarketplaceCanCall() external payable {
+
+        transactions[_itemId] = Transaction({
+            itemId: _itemId,
+            seller: _seller,
+            buyer: _buyer,
+            moderator: address(0),
+            price: _price,
+            moderatorFee: 0,
+            buyerApproved: true,
+            sellerApproved: true,
+            disputed: false,
+            disputedBySeller: false,
+            disputedByBuyer: false,
+            isCompleted: true,
+            creationTime: block.timestamp
+        });
+        emit TransactionCreatedWithoutModerator(_itemId, _buyer, _seller, _price, block.timestamp);
+
+        finalizeTransactionWithoutModerator(_itemId);
+    }
+
+    function approve(uint256 _itemId) external 
+        onlyBuyerOrSeller(_itemId) 
         notCompleted(_itemId) {
 
         Transaction storage transaction = transactions[_itemId];
-        transaction.buyerApproved = true;
+
+        if (msg.sender == transaction.seller) 
+            transaction.sellerApproved = true;
+        else 
+            transaction.buyerApproved = true;
+
         emit TransactionApproved(_itemId, msg.sender);
 
         finalizeTransaction(_itemId);
     }
 
-    function approveBySeller(uint256 _itemId) external 
-        onlySeller(_itemId) 
-        notCompleted(_itemId) {
-
-        Transaction storage transaction = transactions[_itemId];
-        transaction.sellerApproved = true;
-        emit TransactionApproved(_itemId, msg.sender);
-
-        finalizeTransaction(_itemId);
-    }
-
-    function raiseDispute(uint256 _itemId, address disputer) external 
+    function raiseDispute(uint256 _itemId) external 
         onlyBuyerOrSeller(_itemId) 
         notCompleted(_itemId) {
 
@@ -218,7 +241,7 @@ contract Escrow is Ownable {
         else 
             transaction.disputedByBuyer = true;
 
-        emit TransactionDisputed(_itemId, disputer);
+        emit TransactionDisputed(_itemId, msg.sender);
     }
 
     function finalizeTransaction(uint256 _itemId) internal {
@@ -243,6 +266,17 @@ contract Escrow is Ownable {
             
             emit TransactionCompleted(_itemId);
         }
+    }
+
+    function finalizeTransactionWithoutModerator(uint256 _itemId) internal 
+    {
+        Transaction storage transaction = transactions[_itemId];
+
+        // Transfer remaining amount to seller
+        (bool successSeller, ) = transaction.seller.call{value: transaction.price}(""); 
+        require(successSeller, "Transfer to seller failed");
+
+        emit TransactionCompleted(_itemId);
     }
 
 
