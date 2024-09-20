@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 
 interface IUsers {
+
     struct UserProfile {
         address userAddress;
         string username;
@@ -20,35 +21,30 @@ interface IUsers {
         uint8 moderatorFee;
     }
 
-    event UserRegistered(address indexed userAddress, string indexed username, string firstName,
+    event UserRegistered(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserUpdated(address indexed userAddress, string indexed username, string firstName,
+    event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserDeleted(address indexed userAddress, string indexed username);
+    event UserDeleted(address indexed userAddress, string username);
 
     function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
-    
+
     function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
-    
+
     function deleteProfile() external;
-    
+
     function isRegisteredUser(address _user) external view returns (bool);
-    
+
     function isModerator(address _user) external view returns (bool);
-    
+
     function getProfile(address _user) external view returns (UserProfile memory);
 }
 
 
 
 interface IEscrow {
-
-    struct Moderator {
-        address moderator;
-        uint256 fee;
-    }
 
     struct Transaction {
         uint256 itemId;
@@ -98,7 +94,6 @@ interface IEscrow {
     function raiseDispute(uint256 _itemId) external;
 
     function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable;
-
 }
 
 
@@ -207,7 +202,7 @@ contract Marketplace is Ownable {
     }
 
     modifier correctAmountSent(address sellerAddress, uint256 id) {
-        if (items[sellerAddress][id].price != msg.value) {
+        if (items[sellerAddress][id].price > msg.value) {
             revert SentValueDifferentThanItemPrice(sellerAddress, id, msg.value);
         }
         _;
@@ -353,7 +348,7 @@ contract Marketplace is Ownable {
         {
         if (_isGift)
             _price = 0;
-            
+
         items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes,ItemStatus.LISTED, _condition, _category, _subcategory, _country, _isGift);
         emit ItemUpdated(id, msg.sender, _title, _description, _price, photosIPFSHashes);
     }
