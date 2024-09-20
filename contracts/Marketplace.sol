@@ -112,6 +112,8 @@ error PhotoLimitExceeded();
 error NotIPFSHash(string hash);
 error MustBeModerator(address moderator);
 error ModeratorCantBeBuyerOrSeller();
+error NotValidCategoryAndSubcategory();
+error MustNotBeGift();
 
 
 contract Marketplace is Ownable {
@@ -122,6 +124,14 @@ contract Marketplace is Ownable {
         DELETED
     }
 
+    enum Condition {
+        NEW,
+        LIKE_NEW,
+        EXCELLENT,
+        GOOD,
+        DAMAGED
+    }
+
     struct Item {
         uint256 id;
         address seller;
@@ -130,12 +140,18 @@ contract Marketplace is Ownable {
         string title;
         string[] photosIPFSHashes;
         ItemStatus itemStatus;
+        Condition condition;
+        string category;
+        string subcategory;
+        string country;
+        bool isGift;
     }
 
     uint8 constant public MAX_PHOTO_LIMIT = 3;
 
     uint256 itemCount;
     mapping(address => mapping(uint256 => Item)) private items; //mapping seller address to mapping of id to Item
+    mapping(string => string[]) private categories; // mapping category name to list of subcategories
 
     event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
     event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
@@ -145,23 +161,32 @@ contract Marketplace is Ownable {
     IEscrow public escrowContract;
     IUsers public usersContract;
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner) Ownable(initialOwner) {
+        categories["Electronics"] = ["Mobile Phones", "Laptops", "Cameras", "Headphones", "Smart Watches", "Other"];
+        categories["Clothing"] = ["Men's Apparel", "Women's Apparel", "Kids' Apparel", "Accessories", "Man's shoes", "Women's shoes", "Other"];
+        categories["Furniture"] = ["Living Room", "Bedroom", "Office", "Outdoor", "Other"];
+        categories["Toys"] = ["Educational", "Outdoor", "Action Figures", "Building Sets", "Other"];
+        categories["Books"] = ["Fiction", "Non-Fiction", "Children's Books", "Textbooks", "Other"];
+        categories["Sports"] = ["Equipment", "Apparel", "Footwear", "Accessories", "Other"];
+        categories["Home Appliances"] = ["Kitchen", "Laundry", "Heating & Cooling", "Other"];
+        categories["Beauty"] = ["Skincare", "Makeup", "Fragrances", "Hair Care", "Other"];
+        categories["Automotive"] = ["Parts", "Accessories", "Tools", "Other"];
+        categories["Collectibles"] = ["Coins", "Stamps", "Trading Cards", "Art", "Other"];
+    }
 
 
     modifier isListed(address sellerAddress, uint256 id) {
-        Item memory listing = items[sellerAddress][id];
-        if (listing.price <= 0) {
+        if (items[sellerAddress][id].price < 0) {
             revert ItemNotListed(sellerAddress, id);
         }
-        else if (listing.itemStatus != ItemStatus.LISTED) {
+        else if (items[sellerAddress][id].itemStatus != ItemStatus.LISTED) {
             revert ItemNotListed(sellerAddress, id);
         }
         _;
     }
 
     modifier belongsToSeller(address sellerAddress, uint256 id) {
-        Item memory listing = items[sellerAddress][id];
-        if (listing.seller != sellerAddress) {
+        if (items[sellerAddress][id].seller != sellerAddress) {
             revert ItemNotBelongsToSeller(sellerAddress, id);
         }
         _;
@@ -188,8 +213,15 @@ contract Marketplace is Ownable {
         _;
     }
 
-    modifier priceMustBeAboveZero(uint256 price) {
-        if (price <= 0) {
+    modifier notGift(address sellerAddress, uint256 id) {
+        if (items[sellerAddress][id].isGift) {
+            revert MustNotBeGift();
+        }
+        _;
+    }
+
+    modifier priceMustBeAboveOrEqualZero(uint256 price) {
+        if (price < 0) {
             revert PriceMustBeAboveZero();
         }
         _;
@@ -209,6 +241,29 @@ contract Marketplace is Ownable {
         _;
     }
 
+    modifier isValidCategoryAndSubcategory(string memory category, string memory subcategory) {
+        bool isOkay = false;
+        for (uint i = 0; i < categories[category].length; i++) {
+            if (keccak256(abi.encodePacked(categories[category][i])) == keccak256(abi.encodePacked(subcategory))) {
+                isOkay =true;
+            }
+        }
+        if (!isOkay) {
+            revert NotValidCategoryAndSubcategory();
+        }
+        _;
+    }
+
+
+    modifier isValidIPFSHashes(string[] memory photosIPFSHashes) {
+        for (uint i = 0; i < photosIPFSHashes.length; i++) {
+            if (!isIPFSHash(photosIPFSHashes[i])) {
+                revert NotIPFSHash(photosIPFSHashes[i]);
+            }
+        }
+        _;
+    }
+
     function setUsersContractAddress(address _usersContractAddress) external 
         onlyOwner {
         usersContract = IUsers(_usersContractAddress);
@@ -219,35 +274,87 @@ contract Marketplace is Ownable {
         escrowContract = IEscrow(_escrowContractAddress);
     }
 
-    function listNewItem(string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes) external 
-        priceMustBeAboveZero(_price) 
-        numberOfPhotosMustBeBelowLimit(photosIPFSHashes) {
+    function listNewItem(
+        string memory _title, 
+        string memory _description, 
+        uint256 _price, 
+        string[] memory photosIPFSHashes, 
+        Condition _condition,
+        string memory _category,
+        string memory _subcategory,
+        string memory _country,
+        bool _isGift
+        ) 
+        external 
+        priceMustBeAboveOrEqualZero(_price) 
+        numberOfPhotosMustBeBelowLimit(photosIPFSHashes)    
+        isValidCategoryAndSubcategory(_category, _subcategory)
+        {
 
-        for (uint i = 0; i < photosIPFSHashes.length; i++) {
-            if (!isIPFSHash(photosIPFSHashes[i])) {
-                revert NotIPFSHash(photosIPFSHashes[i]);
-            }
-        }
-        
+        finalizeListItem(_title, _description, _price, photosIPFSHashes, _condition, _category, _subcategory, _country, _isGift);
+    }
+
+    function finalizeListItem(
+        string memory _title, 
+        string memory _description, 
+        uint256 _price, 
+        string[] memory photosIPFSHashes, 
+        Condition _condition,
+        string memory _category,
+        string memory _subcategory,
+        string memory _country,
+        bool _isGift
+    )   internal 
+        isValidIPFSHashes(photosIPFSHashes)
+    {
+
         itemCount++;
         uint256 id = createHash(itemCount, msg.sender);
-        items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes, ItemStatus.LISTED);
+        if (_isGift)
+            _price = 0;
+
+        items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes, ItemStatus.LISTED, _condition, _category, _subcategory, _country, _isGift);
         emit ItemListed(id, msg.sender, _title, _description, _price, photosIPFSHashes);
     }
 
-    function updateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes) external
+    function updateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes,
+        Condition _condition,
+        string memory _category,
+        string memory _subcategory,
+        string memory _country,
+        bool _isGift) external
         belongsToSeller(msg.sender, id) 
-        isListed(msg.sender, id) 
-        priceMustBeAboveZero(_price) 
-        numberOfPhotosMustBeBelowLimit(photosIPFSHashes) {
+        priceMustBeAboveOrEqualZero(_price) 
+        numberOfPhotosMustBeBelowLimit(photosIPFSHashes)
+        {
 
-        for (uint i = 0; i < photosIPFSHashes.length; i++) {
-            if (!isIPFSHash(photosIPFSHashes[i])) {
-                revert NotIPFSHash(photosIPFSHashes[i]);
-            }
-        }
-        
-        items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes,ItemStatus.LISTED);
+        finalizeUpdateItem(id, _title, _description, _price, photosIPFSHashes, _condition, _category, _subcategory, _country, _isGift);
+    }
+
+    function finalizeUpdateItem(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes,
+        Condition _condition,
+        string memory _category,
+        string memory _subcategory,
+        string memory _country,
+        bool _isGift) internal 
+        isListed(msg.sender, id) 
+        isValidIPFSHashes(photosIPFSHashes)
+        {
+        finalizeUpdateItem2(id, _title, _description, _price, photosIPFSHashes, _condition, _category, _subcategory, _country, _isGift);
+    }
+
+    function finalizeUpdateItem2(uint256 id, string memory _title, string memory _description, uint256 _price, string[] memory photosIPFSHashes,
+        Condition _condition,
+        string memory _category,
+        string memory _subcategory,
+        string memory _country,
+        bool _isGift) internal 
+        isValidCategoryAndSubcategory(_category, _subcategory)
+        {
+        if (_isGift)
+            _price = 0;
+            
+        items[msg.sender][id] = Item(id, msg.sender, _price, _description, _title, photosIPFSHashes,ItemStatus.LISTED, _condition, _category, _subcategory, _country, _isGift);
         emit ItemUpdated(id, msg.sender, _title, _description, _price, photosIPFSHashes);
     }
 
@@ -287,15 +394,16 @@ contract Marketplace is Ownable {
         belongsToSeller(sellerAddress, id) 
         notSeller(sellerAddress, msg.sender) 
         mustBeModerator(_moderator) 
-        correctAmountSent(sellerAddress, id) {
-
-        uint8 moderatorFee = usersContract.getProfile(_moderator).moderatorFee;
-        finalizeBuyItem(sellerAddress, id, _moderator, moderatorFee); //had to move because stack was too deep
+        correctAmountSent(sellerAddress, id) 
+        notGift(sellerAddress, id)
+        {
+        finalizeBuyItem(sellerAddress, id, _moderator); //had to move because stack was too deep
     }
 
-    function finalizeBuyItem(address sellerAddress, uint256 id, address _moderator, uint8 moderatorFee) private 
+    function finalizeBuyItem(address sellerAddress, uint256 id, address _moderator) private 
         moderatorCantBeBuyerOrSeller(_moderator, sellerAddress){
             
+        uint8 moderatorFee = usersContract.getProfile(_moderator).moderatorFee;
         try escrowContract.createTransaction{value: msg.value}(id, sellerAddress, msg.sender,_moderator,items[sellerAddress][id].price, moderatorFee) {
             items[sellerAddress][id].itemStatus = ItemStatus.BOUGHT;
             emit ItemBought(id, sellerAddress, msg.sender);
@@ -309,7 +417,8 @@ contract Marketplace is Ownable {
         isListed(sellerAddress, id) 
         belongsToSeller(sellerAddress, id) 
         notSeller(sellerAddress, msg.sender) 
-        correctAmountSent(sellerAddress, id) {
+        correctAmountSent(sellerAddress, id) 
+        {
 
         finalizeBuyItemWithoutModerator(sellerAddress, id);
     }
