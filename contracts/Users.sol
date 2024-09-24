@@ -3,16 +3,86 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+
+
+interface IEscrow {
+
+    struct Transaction {
+        uint256 itemId;
+        address seller;
+        address moderator;
+        address buyer;
+        uint256 price;
+        uint8 moderatorFee;
+        bool buyerApproved;
+        bool sellerApproved;
+        bool disputed;
+        bool disputedBySeller;
+        bool disputedByBuyer;
+        bool isCompleted;
+        uint256 creationTime;
+    }
+
+    event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, 
+        address moderator, uint256 price, uint8 moderatorFee, uint256 creationTime);
+    event TransactionCreatedWithoutModerator(uint256 indexed itemId, address indexed buyer, address indexed seller, 
+        uint256 price, uint256 creationTime);
+    event TransactionApproved(uint256 indexed itemId, address approver);
+    event TransactionCompleted(uint256 indexed itemId);
+    event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage);
+    event TransactionDisputed(uint256 indexed itemId, address disputer);
+
+    function setMarketplaceContractAddress(address _marketplaceContractAddress) external;
+
+    function createTransaction(
+        uint256 _itemId,
+        address _seller,
+        address _buyer,
+        address _moderator,
+        uint256 _price,
+        uint8 _moderatorFee
+    ) external payable;
+
+    function createTransactionWithoutModerator(
+        uint256 _itemId,
+        address _seller,
+        address _buyer,
+        uint256 _price
+    ) external payable;
+
+    function approve(uint256 _itemId) external;
+
+    function raiseDispute(uint256 _itemId) external;
+
+    function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable;
+
+    function isTransactionReadyForReview(
+        uint256 _itemId,
+        address from,
+        address to
+    ) external view returns (bool);
+}
+
+
+
 error UserAlreadyExists(address userAddress);
 error UserDoesNotExist(address userAddress);
 error UsernameExists(string username);
 error NotIPFSHash(string hashString);
 error ModeratorFeeLimitsNotRespected(uint8 moderatorFee);
+error AlreadyReviewed();
 
 
 contract Users is Ownable{
 
     constructor(address initialOwner) Ownable(initialOwner) {}
+
+    struct Review {
+        string content;
+        uint8 rating; //1-5
+        uint256 itemId;
+        address from;
+    }
 
     struct UserProfile {
         address userAddress;
@@ -29,8 +99,12 @@ contract Users is Ownable{
     }
 
     mapping(address => UserProfile) public userProfiles;
+    mapping(address => Review[]) public reviews;
 
     mapping(string => bool) private usernameExists;
+
+    IEscrow public escrowContract;
+
 
     uint8 constant public MAX_MODERATOR_FEE = 20;
 
@@ -39,6 +113,7 @@ contract Users is Ownable{
     event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
     event UserDeleted(address indexed userAddress, string username);
+    event ReviewCreated(address indexed from, address indexed to, string content, uint8 rating, uint256 itemId);
 
 
     modifier userMustExist(address userAddress) {
@@ -60,6 +135,11 @@ contract Users is Ownable{
             revert UsernameExists(username);
         }
         _;
+    }
+
+    function setEscrowContractAddress(address _escrowContractAddress) external 
+        onlyOwner {
+        escrowContract = IEscrow(_escrowContractAddress);
     }
 
     function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
@@ -159,5 +239,27 @@ contract Users is Ownable{
 
     function compareStrings(string memory _a, string memory _b) private pure returns(bool) {
         return keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
+    }
+
+    function isAlreadyReviewed(Review[] storage userReviews, uint256 itemId) internal view returns (bool) {
+        for (uint256 i = 0; i < userReviews.length; i++) {
+            if (userReviews[i].itemId == itemId && userReviews[i].from == msg.sender) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function createReview(address toWhom, uint256 itemId, uint8 rating, string memory content) external {
+        if (userProfiles[msg.sender].exists && userProfiles[toWhom].exists && 
+            escrowContract.isTransactionReadyForReview(itemId, msg.sender, toWhom)) {
+            Review[] storage userReviews = reviews[toWhom];
+            if (!isAlreadyReviewed(userReviews, itemId) && rating >= 1 && rating <= 5) {
+                userReviews.push(Review(content, rating, itemId, msg.sender));
+                emit ReviewCreated(msg.sender, toWhom, content, rating, itemId);
+            }
+            else
+                revert AlreadyReviewed();
+        }
     }
 }
