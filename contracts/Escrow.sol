@@ -4,6 +4,44 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 
+interface IUsers {
+
+    struct UserProfile {
+        address userAddress;
+        string username;
+        string firstName;
+        string lastName;
+        string country;
+        string description;
+        string email;
+        string avatarHash;
+        bool isModerator;
+        bool exists;
+        uint8 moderatorFee;
+    }
+
+    event UserRegistered(address indexed userAddress, string username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
+    event UserUpdated(address indexed userAddress, string username, string firstName,
+        string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
+    event UserDeleted(address indexed userAddress, string username);
+
+    function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
+        string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
+
+    function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
+        string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
+
+    function deleteProfile() external;
+
+    function isRegisteredUser(address _user) external view returns (bool);
+
+    function isModerator(address _user) external view returns (bool);
+
+    function getProfile(address _user) external view returns (UserProfile memory);
+}
+
+
 interface IMarketplace {
     
     enum ItemStatus {
@@ -87,6 +125,7 @@ error TxCantBeCompleted();
 error ValueDistributionNotCorrect();
 error TxExists(uint256 id);
 error OnlyMarketplaceContractCanCall();
+error OnlyUsersContractCanCall();
 error MustBeDisputed();
 
 
@@ -96,12 +135,6 @@ contract Escrow is Ownable {
         address moderator;
         uint256 fee;
     }
-
-    // enum TransactionStatus {   //DO I NEED THIS??
-    //     FUNDED,
-    //     SHIPPED,
-    //     RECEIVED
-    // }
 
     struct Transaction {
         uint256 itemId;
@@ -120,6 +153,7 @@ contract Escrow is Ownable {
     }
 
     IMarketplace public marketplaceContract;
+    IUsers public usersContract;
 
     mapping(uint256 => Transaction) private transactions; // item id to transaction mapping -> 1:1 itemId Transaction
 
@@ -147,10 +181,21 @@ contract Escrow is Ownable {
         _;
     }
 
+    modifier onlyUsersCanCall() {
+        if (msg.sender != address(usersContract)) {
+            revert OnlyUsersContractCanCall();
+        }
+        _;
+    }
+
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     function setMarketplaceContractAddress(address _marketplaceContractAddress) external onlyOwner {
         marketplaceContract = IMarketplace(_marketplaceContractAddress);
+    }
+
+    function setUsersContractAddress(address _usersContractAddress) external onlyOwner {
+        usersContract = IUsers(_usersContractAddress);
     }
 
     modifier onlyModerator(uint256 itemId) {
@@ -353,5 +398,19 @@ contract Escrow is Ownable {
 
         emit TransactionCompletedByModerator(_itemId, percentageBuyer, percentageSeller);
     }
+
+    function isTransactionReadyForReview(uint256 _itemId, address from, address to) external view onlyUsersCanCall() returns (bool) {
+        Transaction storage transaction = transactions[_itemId];
+
+        if ((from == transaction.seller || from == transaction.buyer || from == transaction.moderator) && 
+            (to == transaction.seller || to == transaction.buyer || to == transaction.moderator) && (from != to) &&
+            transaction.isCompleted)
+            return true;
+
+        return (
+            false
+        );
+    }
+
 
 }

@@ -51,4 +51,10 @@ interface IEscrow {
     function raiseDispute(uint256 _itemId) external;
 
     function finalizeTransactionByModerator(uint256 _itemId, uint8 percentageSeller, uint8 percentageBuyer) external payable;
+
+    function isTransactionReadyForReview(
+        uint256 _itemId,
+        address from,
+        address to
+    ) external view returns (bool);
 }
