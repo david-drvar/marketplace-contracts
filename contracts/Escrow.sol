@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
 interface IUsers {
@@ -43,7 +44,7 @@ interface IUsers {
 
 
 interface IMarketplace {
-    
+
     enum ItemStatus {
         LISTED,
         BOUGHT,
@@ -62,6 +63,7 @@ interface IMarketplace {
         uint256 id;
         address seller;
         uint256 price;
+        string currency;
         string description;
         string title;
         string[] photosIPFSHashes;
@@ -73,8 +75,36 @@ interface IMarketplace {
         bool isGift;
     }
 
-    event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
-    event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
+    event ItemListed(
+        uint256 indexed id,
+        address indexed seller,
+        string title,
+        string description,
+        uint256 price,
+        string currency,
+        string[] photosIPFSHashes,
+        Condition condition,
+        string category,
+        string subcategory,
+        string country,
+        bool isGift
+    );
+
+    event ItemUpdated(
+        uint256 indexed id,
+        address indexed seller,
+        string title,
+        string description,
+        uint256 price,
+        string currency,
+        string[] photosIPFSHashes,
+        Condition condition,
+        string category,
+        string subcategory,
+        string country,
+        bool isGift
+    );
+
     event ItemBought(uint256 indexed id, address indexed seller, address indexed buyer);
     event ItemDeleted(uint256 indexed id, address indexed seller);
 
@@ -82,38 +112,15 @@ interface IMarketplace {
 
     function setEscrowContractAddress(address _escrowContractAddress) external;
 
-    function listNewItem(
-        string memory _title, 
-        string memory _description, 
-        uint256 _price, 
-        string[] memory photosIPFSHashes, 
-        Condition _condition,
-        string memory _category,
-        string memory _subcategory,
-        string memory _country,
-        bool _isGift
-    ) external;
+    function addSupportedToken(string memory tokenName, address tokenAddress) external;
 
-    function updateItem(
-        uint256 id, 
-        string memory _title, 
-        string memory _description, 
-        uint256 _price, 
-        string[] memory photosIPFSHashes,
-        Condition _condition,
-        string memory _category,
-        string memory _subcategory,
-        string memory _country,
-        bool _isGift
-    ) external;
+    function listNewItem(Item memory item) external;
+
+    function updateItem(Item memory item) external;
 
     function deleteItem(uint256 id) external;
 
     function buyItem(address sellerAddress, uint256 id, address _moderator) external payable;
-
-    function buyItemWithoutModerator(address sellerAddress, uint256 id) external payable;
-
-    function getItemCount() external view returns (uint256);
 }
 
 
@@ -142,6 +149,7 @@ contract Escrow is Ownable {
         address moderator;
         address buyer;
         uint256 price;
+        string currency;
         uint8 moderatorFee;
         bool buyerApproved;
         bool sellerApproved;
@@ -156,11 +164,12 @@ contract Escrow is Ownable {
     IUsers public usersContract;
 
     mapping(uint256 => Transaction) private transactions; // item id to transaction mapping -> 1:1 itemId Transaction
+    mapping(string => address) public supportedTokens;
 
     event TransactionCreated(uint256 indexed itemId, address indexed buyer, address indexed seller, 
-        address moderator, uint256 price, uint8 moderatorFee, uint256 creationTime);
+        address moderator, uint256 price, string currency, uint8 moderatorFee, uint256 creationTime);
     event TransactionCreatedWithoutModerator(uint256 indexed itemId, address indexed buyer, address indexed seller, 
-        uint256 price, uint256 creationTime);
+        uint256 price, string currency, uint256 creationTime);
     event TransactionApproved(uint256 indexed itemId, address approver);
     event TransactionCompleted(uint256 indexed itemId);
     event TransactionCompletedByModerator(uint256 indexed itemId, uint8 buyerPercentage, uint8 sellerPercentage);
@@ -189,6 +198,10 @@ contract Escrow is Ownable {
     }
 
     constructor(address initialOwner) Ownable(initialOwner) {}
+
+    function addSupportedToken(string memory tokenName, address tokenAddress) external onlyOwner {
+        supportedTokens[tokenName] = tokenAddress;
+    }
 
     function setMarketplaceContractAddress(address _marketplaceContractAddress) external onlyOwner {
         marketplaceContract = IMarketplace(_marketplaceContractAddress);
@@ -253,6 +266,7 @@ contract Escrow is Ownable {
         address _buyer,
         address _moderator,
         uint256 _price,
+        string memory _currency,
         uint8 _moderatorFee
     ) txExists(_itemId) onlyMarketplaceCanCall() external payable {
 
@@ -262,6 +276,7 @@ contract Escrow is Ownable {
             buyer: _buyer,
             moderator: _moderator,
             price: _price,
+            currency: _currency,
             moderatorFee: _moderatorFee,
             buyerApproved: false,
             sellerApproved: false,
@@ -272,14 +287,15 @@ contract Escrow is Ownable {
             creationTime: block.timestamp
         });
 
-        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _moderatorFee, block.timestamp);
+        emit TransactionCreated(_itemId, _buyer, _seller, _moderator, _price, _currency, _moderatorFee, block.timestamp);
     }
 
     function createTransactionWithoutModerator(
         uint256 _itemId,
         address _seller,
         address _buyer,
-        uint256 _price
+        uint256 _price,
+        string memory _currency
     ) txExists(_itemId) onlyMarketplaceCanCall() external payable {
 
         transactions[_itemId] = Transaction({
@@ -288,6 +304,7 @@ contract Escrow is Ownable {
             buyer: _buyer,
             moderator: address(0),
             price: _price,
+            currency: _currency,
             moderatorFee: 0,
             buyerApproved: true,
             sellerApproved: true,
@@ -297,7 +314,7 @@ contract Escrow is Ownable {
             isCompleted: true,
             creationTime: block.timestamp
         });
-        emit TransactionCreatedWithoutModerator(_itemId, _buyer, _seller, _price, block.timestamp);
+        emit TransactionCreatedWithoutModerator(_itemId, _buyer, _seller, _price, _currency, block.timestamp);
 
         finalizeTransactionWithoutModerator(_itemId);
     }
@@ -341,16 +358,26 @@ contract Escrow is Ownable {
             uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
             uint256 sellerAmount = transaction.price - moderatorFeeAmount;
 
-            // Transfer to moderator their cut
-            (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
-            require(successModerator, "Transfer to moderator failed");
+            if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+                // Transfer to moderator their cut
+                (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
+                require(successModerator, "Transfer to moderator failed");
 
-            // Transfer remaining amount to seller
-            (bool successSeller, ) = transaction.seller.call{value: sellerAmount}(""); 
-            require(successSeller, "Transfer to seller failed");
+                // Transfer remaining amount to seller
+                (bool successSeller, ) = transaction.seller.call{value: sellerAmount}(""); 
+                require(successSeller, "Transfer to seller failed");
+            }
+            else {
+                address tokenAddress = supportedTokens[transaction.currency];
 
+                IERC20 token = IERC20(tokenAddress);
 
-            //should I inform marketplace to finish with the product ???
+                bool successModerator = token.transfer(transaction.moderator, moderatorFeeAmount);
+                require(successModerator, "Token transfer to moderator failed");
+
+                bool successSeller = token.transfer(transaction.seller, sellerAmount);
+                require(successSeller, "Token transfer to seller failed");
+            }
             
             emit TransactionCompleted(_itemId);
         }
@@ -361,8 +388,17 @@ contract Escrow is Ownable {
         Transaction storage transaction = transactions[_itemId];
 
         // Transfer remaining amount to seller
-        (bool successSeller, ) = transaction.seller.call{value: transaction.price}(""); 
-        require(successSeller, "Transfer to seller failed");
+        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+            (bool successSeller, ) = transaction.seller.call{value: transaction.price}(""); 
+            require(successSeller, "Transfer to seller failed");
+        } else {
+            address tokenAddress = supportedTokens[transaction.currency];
+
+            IERC20 token = IERC20(tokenAddress);
+
+            bool successSeller = token.transfer(transaction.seller, transaction.price);
+            require(successSeller, "Token transfer to seller failed");
+        }
 
         emit TransactionCompleted(_itemId);
     }
@@ -387,14 +423,29 @@ contract Escrow is Ownable {
         uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
         uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
 
-        (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
-        require(successModerator, "Transfer to moderator failed");
+        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+            (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
+            require(successModerator, "Transfer to moderator failed");
 
-        (bool successSeller, ) = transaction.seller.call{value: sellerAmount}("");
-        require(successSeller, "Transfer to seller failed");
+            (bool successSeller, ) = transaction.seller.call{value: sellerAmount}("");
+            require(successSeller, "Transfer to seller failed");
 
-        (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
-        require(successBuyer, "Transfer to buyer failed");
+            (bool successBuyer, ) = transaction.buyer.call{value: buyerAmount}("");
+            require(successBuyer, "Transfer to buyer failed");
+        } else {
+            address tokenAddress = supportedTokens[transaction.currency];
+
+            IERC20 token = IERC20(tokenAddress);
+
+            bool successModerator = token.transfer(transaction.moderator, moderatorFeeAmount);
+            require(successModerator, "Token transfer to moderator failed");
+
+            bool successSeller = token.transfer(transaction.seller, sellerAmount);
+            require(successSeller, "Token transfer to seller failed");
+
+            bool successBuyer = token.transfer(transaction.buyer, buyerAmount);
+            require(successBuyer, "Token transfer to buyer failed");
+        }
 
         emit TransactionCompletedByModerator(_itemId, percentageBuyer, percentageSeller);
     }
@@ -407,9 +458,7 @@ contract Escrow is Ownable {
             transaction.isCompleted)
             return true;
 
-        return (
-            false
-        );
+        return false;
     }
 
 
