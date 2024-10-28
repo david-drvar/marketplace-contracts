@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 interface IMarketplace {
-    
+
     enum ItemStatus {
         LISTED,
         BOUGHT,
@@ -21,6 +21,7 @@ interface IMarketplace {
         uint256 id;
         address seller;
         uint256 price;
+        string currency;
         string description;
         string title;
         string[] photosIPFSHashes;
@@ -32,8 +33,36 @@ interface IMarketplace {
         bool isGift;
     }
 
-    event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
-    event ItemUpdated(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string[] photosIPFSHashes);
+    event ItemListed(
+        uint256 indexed id,
+        address indexed seller,
+        string title,
+        string description,
+        uint256 price,
+        string currency,
+        string[] photosIPFSHashes,
+        Condition condition,
+        string category,
+        string subcategory,
+        string country,
+        bool isGift
+    );
+
+    event ItemUpdated(
+        uint256 indexed id,
+        address indexed seller,
+        string title,
+        string description,
+        uint256 price,
+        string currency,
+        string[] photosIPFSHashes,
+        Condition condition,
+        string category,
+        string subcategory,
+        string country,
+        bool isGift
+    );
+
     event ItemBought(uint256 indexed id, address indexed seller, address indexed buyer);
     event ItemDeleted(uint256 indexed id, address indexed seller);
 
@@ -41,36 +70,13 @@ interface IMarketplace {
 
     function setEscrowContractAddress(address _escrowContractAddress) external;
 
-    function listNewItem(
-        string memory _title, 
-        string memory _description, 
-        uint256 _price, 
-        string[] memory photosIPFSHashes, 
-        Condition _condition,
-        string memory _category,
-        string memory _subcategory,
-        string memory _country,
-        bool _isGift
-    ) external;
+    function addSupportedToken(string memory tokenName, address tokenAddress) external;
 
-    function updateItem(
-        uint256 id, 
-        string memory _title, 
-        string memory _description, 
-        uint256 _price, 
-        string[] memory photosIPFSHashes,
-        Condition _condition,
-        string memory _category,
-        string memory _subcategory,
-        string memory _country,
-        bool _isGift
-    ) external;
+    function listNewItem(Item memory item) external;
+
+    function updateItem(Item memory item) external;
 
     function deleteItem(uint256 id) external;
 
     function buyItem(address sellerAddress, uint256 id, address _moderator) external payable;
-
-    function buyItemWithoutModerator(address sellerAddress, uint256 id) external payable;
-
-    function getItemCount() external view returns (uint256);
 }
