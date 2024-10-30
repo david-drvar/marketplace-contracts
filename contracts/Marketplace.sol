@@ -123,7 +123,6 @@ error PriceMustBeAboveZero();
 error ItemNotListed(address sellerAddress, uint256 id);
 error ItemNotBelongsToSeller(address sellerAddress, uint256 id);
 error SellerCannotBuyItsItem(address sellerAddress);
-error SentValueDifferentThanItemPrice(address sellerAddress, uint256 id, uint256 value);
 error PhotoLimitExceeded();
 error NotIPFSHash(string hash);
 error MustBeModerator(address moderator);
@@ -223,13 +222,6 @@ contract Marketplace is Ownable {
     modifier mustBeModerator(address moderator) {
         if (!usersContract.isModerator(moderator)) {
             revert MustBeModerator(moderator);
-        }
-        _;
-    }
-
-    modifier correctAmountSent(address sellerAddress, uint256 id) {
-        if (items[sellerAddress][id].price > msg.value) {
-            revert SentValueDifferentThanItemPrice(sellerAddress, id, msg.value);
         }
         _;
     }
@@ -400,7 +392,7 @@ contract Marketplace is Ownable {
             require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(escrowContract)) >= items[sellerAddress][id].price, "Insufficient allowance for escrow contract");
             
             // sender must have enough token balance on his address
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(address(msg.sender)) >= items[sellerAddress][id].price, "Insufficient token balance");
+            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(msg.sender) >= items[sellerAddress][id].price, "Insufficient token balance");
         }
         finalizeBuyItem(sellerAddress, id, _moderator);
     }
@@ -428,8 +420,19 @@ contract Marketplace is Ownable {
         isListed(sellerAddress, id) 
         belongsToSeller(sellerAddress, id) 
         notSeller(sellerAddress, msg.sender) 
-        correctAmountSent(sellerAddress, id) 
         {
+
+        if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) == keccak256(abi.encodePacked("ETH"))) {
+            require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
+        }
+        else {
+            // check if buyer(sender) has allowed marketplace and escrow contract to transfer funds
+            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(this)) >= items[sellerAddress][id].price, "Insufficient allowance for marketplace contract");
+            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(escrowContract)) >= items[sellerAddress][id].price, "Insufficient allowance for escrow contract");
+            
+            // sender must have enough token balance on his address
+            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(msg.sender) >= items[sellerAddress][id].price, "Insufficient token balance");
+        }
 
         finalizeBuyItemWithoutModerator(sellerAddress, id);
     }
