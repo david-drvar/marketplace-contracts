@@ -387,9 +387,8 @@ contract Marketplace is Ownable {
             require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
         }
         else {
-            // check if buyer(sender) has allowed marketplace and escrow contract to transfer funds
+            // check if buyer(sender) has allowed marketplace contract to transfer funds
             require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(this)) >= items[sellerAddress][id].price, "Insufficient allowance for marketplace contract");
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(escrowContract)) >= items[sellerAddress][id].price, "Insufficient allowance for escrow contract");
             
             // sender must have enough token balance on his address
             require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(msg.sender) >= items[sellerAddress][id].price, "Insufficient token balance");
@@ -426,8 +425,7 @@ contract Marketplace is Ownable {
             require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
         }
         else {
-            // check if buyer(sender) has allowed marketplace and escrow contract to transfer funds
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(this)) >= items[sellerAddress][id].price, "Insufficient allowance for marketplace contract");
+            // check if buyer(sender) has allowed escrow contract to transfer funds
             require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(escrowContract)) >= items[sellerAddress][id].price, "Insufficient allowance for escrow contract");
             
             // sender must have enough token balance on his address
