@@ -396,7 +396,7 @@ contract Escrow is Ownable {
 
             IERC20 token = IERC20(tokenAddress);
 
-            bool successSeller = token.transfer(transaction.seller, transaction.price);
+            bool successSeller = token.transferFrom(transaction.buyer, transaction.seller, transaction.price);
             require(successSeller, "Token transfer to seller failed");
         }
 
