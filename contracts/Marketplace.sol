@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
 interface IUsers {
@@ -130,7 +130,7 @@ error TokenNotSupported();
 error UserNotRegistered();
 
 
-contract Marketplace is Ownable {
+contract Marketplace is Initializable, OwnableUpgradeable {
 
     enum ItemStatus {
         LISTED,
@@ -179,7 +179,11 @@ contract Marketplace is Ownable {
     IEscrow public escrowContract;
     IUsers public usersContract;
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner); // Initialize OwnableUpgradeable
+        transferOwnership(initialOwner); // Set the owner explicitly
+
+        // Initialize categories
         categories["Electronics"] = ["Mobile Phones", "Laptops", "Cameras", "Headphones", "Smart Watches", "Other"];
         categories["Clothing"] = ["Men's Apparel", "Women's Apparel", "Kids' Apparel", "Accessories", "Man's shoes", "Women's shoes", "Other"];
         categories["Furniture"] = ["Living Room", "Bedroom", "Office", "Outdoor", "Other"];
@@ -191,9 +195,9 @@ contract Marketplace is Ownable {
         categories["Automotive"] = ["Parts", "Accessories", "Tools", "Other"];
         categories["Collectibles"] = ["Coins", "Stamps", "Trading Cards", "Art", "Other"];
 
-        supportedTokens["ETH"] = address(this); // add immediately ETH to supported token as it is native
+        // Initialize supported tokens
+        supportedTokens["ETH"] = address(this);
     }
-
 
     modifier isListed(address sellerAddress, uint256 id) {
         if (items[sellerAddress][id].price < 0) {
