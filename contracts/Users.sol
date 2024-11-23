@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
 interface IEscrow {
@@ -87,9 +87,12 @@ error ModeratorFeeLimitsNotRespected(uint8 moderatorFee);
 error AlreadyReviewed();
 
 
-contract Users is Ownable{
+contract Users is Initializable, OwnableUpgradeable {
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner);
+        transferOwnership(initialOwner);
+    }
 
     struct Review {
         string content;
