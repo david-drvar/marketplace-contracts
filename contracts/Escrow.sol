@@ -25,15 +25,12 @@ interface IUsers {
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
     event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserDeleted(address indexed userAddress, string username);
 
     function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
 
     function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
-
-    function deleteProfile() external;
 
     function isRegisteredUser(address _user) external view returns (bool);
 
@@ -197,7 +194,9 @@ contract Escrow is Ownable {
         _;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner) Ownable(initialOwner) {
+        supportedTokens["ETH"] = address(this); // add immediately ETH to supported token as it is native
+    }
 
     function addSupportedToken(string memory tokenName, address tokenAddress) external onlyOwner {
         supportedTokens[tokenName] = tokenAddress;
