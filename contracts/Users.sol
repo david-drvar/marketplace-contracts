@@ -120,13 +120,12 @@ contract Users is Ownable{
     IEscrow public escrowContract;
 
 
-    uint8 constant public MAX_MODERATOR_FEE = 20;
+    uint8 public maxModeratorFee = 20;
 
     event UserRegistered(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
     event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserDeleted(address indexed userAddress, string username);
     event ReviewCreated(address indexed from, address indexed to, string content, uint8 rating, uint256 itemId);
 
 
@@ -151,25 +150,32 @@ contract Users is Ownable{
         _;
     }
 
+    modifier moderatorFeeInRange(uint8 moderatorFee) {
+        if (moderatorFee < 0 || moderatorFee > maxModeratorFee) {
+            revert ModeratorFeeLimitsNotRespected(moderatorFee);
+        }
+        _;
+    }
+
     function setEscrowContractAddress(address _escrowContractAddress) external 
         onlyOwner {
         escrowContract = IEscrow(_escrowContractAddress);
     }
 
+    function setMaxModeratorFee(uint8 newFee) public onlyOwner {
+        require(newFee <= 25, "Fee cannot exceed 25%");
+        maxModeratorFee = newFee;
+    }
+
     function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) 
-        userMustNotExist(msg.sender) usernameMustNotExist(_username) external {
+        userMustNotExist(msg.sender) usernameMustNotExist(_username) moderatorFeeInRange(_moderatorFee) external {
 
         uint8 fee;
-        if (!_isModerator) {
+        if (!_isModerator)
             fee = 0;
-        }
-        else {
-            if (_moderatorFee < 0 || _moderatorFee > MAX_MODERATOR_FEE)
-                revert ModeratorFeeLimitsNotRespected(_moderatorFee);
-                
+        else
             fee = _moderatorFee;
-        }
 
         userProfiles[msg.sender] = UserProfile({
             userAddress: msg.sender,
@@ -225,17 +231,6 @@ contract Users is Ownable{
         });
 
         emit UserUpdated(msg.sender, _username, _firstName, _lastName, _country, _description, _email, _avatarHash, _isModerator, fee);
-    }
-
-    function deleteProfile() userMustExist(msg.sender) external {
-        require(userProfiles[msg.sender].exists, "Profile does not exist");
-
-        UserProfile memory user = userProfiles[msg.sender];
-
-        delete userProfiles[msg.sender];
-        delete usernameExists[user.username];
-
-        emit UserDeleted(msg.sender, user.username);
     }
 
     function isRegisteredUser(address _user) external view returns (bool) {

@@ -26,15 +26,12 @@ interface IUsers {
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
     event UserUpdated(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
-    event UserDeleted(address indexed userAddress, string username);
 
     function createProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
 
     function updateProfile(string memory _username, string memory _firstName, string memory _lastName, string memory _country,
         string memory _description, string memory _email, string memory _avatarHash, bool _isModerator, uint8 _moderatorFee) external;
-
-    function deleteProfile() external;
 
     function isRegisteredUser(address _user) external view returns (bool);
 
@@ -130,6 +127,7 @@ error ModeratorCantBeBuyerOrSeller();
 error NotValidCategoryAndSubcategory();
 error MustNotBeGift();
 error TokenNotSupported();
+error UserNotRegistered();
 
 
 contract Marketplace is Ownable {
@@ -192,6 +190,8 @@ contract Marketplace is Ownable {
         categories["Beauty"] = ["Skincare", "Makeup", "Fragrances", "Hair Care", "Other"];
         categories["Automotive"] = ["Parts", "Accessories", "Tools", "Other"];
         categories["Collectibles"] = ["Coins", "Stamps", "Trading Cards", "Art", "Other"];
+
+        supportedTokens["ETH"] = address(this); // add immediately ETH to supported token as it is native
     }
 
 
@@ -284,6 +284,13 @@ contract Marketplace is Ownable {
         _;
     }
 
+    modifier userRegistered() {
+        if (!usersContract.isRegisteredUser(msg.sender)) {
+            revert UserNotRegistered();
+        }
+        _;
+    }
+
     function setUsersContractAddress(address _usersContractAddress) external 
         onlyOwner {
         usersContract = IUsers(_usersContractAddress);
@@ -307,6 +314,7 @@ contract Marketplace is Ownable {
         isValidCategoryAndSubcategory(item.category, item.subcategory)
         isValidIPFSHashes(item.photosIPFSHashes)
         supportedToken(item.currency)
+        userRegistered()
         {
 
         finalizeListItem(item);
@@ -382,6 +390,7 @@ contract Marketplace is Ownable {
         notSeller(sellerAddress, msg.sender) 
         mustBeModerator(_moderator) 
         notGift(sellerAddress, id)
+        userRegistered()
         {
         if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) == keccak256(abi.encodePacked("ETH"))) {
             require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
@@ -419,6 +428,7 @@ contract Marketplace is Ownable {
         isListed(sellerAddress, id) 
         belongsToSeller(sellerAddress, id) 
         notSeller(sellerAddress, msg.sender) 
+        userRegistered()
         {
 
         if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) == keccak256(abi.encodePacked("ETH"))) {
