@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
 interface IUsers {
@@ -133,7 +134,7 @@ error OnlyUsersContractCanCall();
 error MustBeDisputed();
 
 
-contract Escrow is Ownable {
+contract Escrow is Initializable, OwnableUpgradeable {
 
     struct Moderator {
         address moderator;
@@ -194,8 +195,12 @@ contract Escrow is Ownable {
         _;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {
-        supportedTokens["ETH"] = address(this); // add immediately ETH to supported token as it is native
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner); // Initialize OwnableUpgradeable
+        transferOwnership(initialOwner); // Set the owner explicitly
+
+        // Initialize supported tokens
+        supportedTokens["ETH"] = address(this);
     }
 
     function addSupportedToken(string memory tokenName, address tokenAddress) external onlyOwner {
