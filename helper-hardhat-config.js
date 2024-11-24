@@ -8,6 +8,9 @@ const networkConfig = {
   11155111: {
     name: "sepolia",
   },
+  80002: {
+    name: "polygonAmoy",
+  },
   1: {
     name: "mainnet",
   },
