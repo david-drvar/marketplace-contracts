@@ -22,6 +22,7 @@ const setAddressesModule = buildModule("SetAddressesModule", (m) => {
 
   // Users calls
   m.call(users, "setEscrowContractAddress", [escrow.address], { id: "Unique9" });
+  m.call(users, "setMaxModeratorFee", [25], { id: "Unique10" });
 
   return {};
 });
