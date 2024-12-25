@@ -686,7 +686,7 @@ describe("Marketplace", function () {
           isGift: false,
         };
 
-        await expect(marketplace.connect(owner).updateItem(itemUpdate)).to.not.be.reverted; //.to.be.revertedWithCustomError(marketplace, "NotIPFSHash").withArgs("QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn");
+        await expect(marketplace.connect(owner).updateItem(itemUpdate)).to.not.be.reverted;
       });
     });
   });
