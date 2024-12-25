@@ -1,4 +1,4 @@
-const { time, loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
@@ -97,7 +97,6 @@ describe("Marketplace", function () {
     describe("Validations", function () {
       it("check deployment valid", async function () {
         const { marketplace } = await loadFixture(deployMarketplaceFixture);
-        console.log("users contract", await marketplace.usersContract());
         expect(await marketplace.getItemCount()).to.be.equal(0);
       });
 
