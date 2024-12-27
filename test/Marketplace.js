@@ -108,7 +108,7 @@ describe("Marketplace", function () {
         const title = "Item title";
         const description = "item description";
         const price = 1000000; //0.5e18;
-        const currency = "ETH";
+        const currency = "POL";
         const condition = 0;
         const category = "Electronics";
         const itemStatus = 0;
@@ -130,7 +130,7 @@ describe("Marketplace", function () {
         const title = "Item title";
         const description = "item description";
         const price = 1000000; //0.5e18;
-        const currency = "ETH";
+        const currency = "POL";
         const condition = 0;
         const category = "Electronics";
         const itemStatus = 0;
@@ -152,7 +152,7 @@ describe("Marketplace", function () {
         const title = "Item title";
         const description = "item description";
         const price = 1000000; //0.5e18;
-        const currency = "ETH";
+        const currency = "POL";
         const condition = 0;
         const category = "Electronics";
         const itemStatus = 0;
@@ -215,7 +215,7 @@ describe("Marketplace", function () {
           id,
           seller: ownerAddress,
           price: 1000000,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -231,7 +231,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(owner).buyItemWithoutModerator(ownerAddress, newItemId)).to.be.revertedWithCustomError(marketplace, "SellerCannotBuyItsItem");
+        await expect(marketplace.connect(owner).buyItemWithoutModerator(newItemId)).to.be.revertedWithCustomError(marketplace, "SellerCannotBuyItsItem");
       });
 
       it("Should not revert buy item without moderator", async function () {
@@ -269,7 +269,7 @@ describe("Marketplace", function () {
           id,
           seller: ownerAddress,
           price: 1000000,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -285,7 +285,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(ownerAddress, newItemId, { value: 1000000 })).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(newItemId, { value: 1000000 })).to.not.be.reverted;
       });
 
       it("Should not revert buy item without moderator + check allowance", async function () {
@@ -347,7 +347,7 @@ describe("Marketplace", function () {
         await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
         await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
 
-        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(ownerAddress, newItemId)).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(newItemId)).to.not.be.reverted;
       });
 
       it("Should not revert buy item without moderator", async function () {
@@ -387,7 +387,7 @@ describe("Marketplace", function () {
           id,
           seller: ownerAddress,
           price: 1000000,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -403,7 +403,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(ownerAddress, newItemId, { value: 1000000 })).to.be.revertedWith("Transaction creation failed");
+        await expect(marketplace.connect(otherAccount).buyItemWithoutModerator(newItemId, { value: 1000000 })).to.be.revertedWith("Transaction creation failed");
       });
 
       it("Should revert if moderator is not valid", async function () {
@@ -417,7 +417,7 @@ describe("Marketplace", function () {
           id,
           seller: ownerAddress,
           price: 1000000,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -433,7 +433,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderator)).to.be.revertedWithCustomError(marketplace, "MustBeModerator");
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderator)).to.be.revertedWithCustomError(marketplace, "MustBeModerator");
       });
 
       it("Should not revert buy item with moderator", async function () {
@@ -471,7 +471,7 @@ describe("Marketplace", function () {
           id,
           seller: ownerAddress,
           price: 1000000,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -487,7 +487,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
       });
 
       it("Should not revert buy item with moderator and stablecoins", async function () {
@@ -549,7 +549,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
       });
 
       it("Should revert buy item with moderator and stablecoins", async function () {
@@ -613,7 +613,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 })).to.be.revertedWith("Transaction creation failed");
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.be.revertedWith("Transaction creation failed");
       });
 
       it("Should not revert delete item", async function () {
@@ -673,7 +673,7 @@ describe("Marketplace", function () {
           id: newItemId,
           seller: ownerAddress,
           price: 1000001,
-          currency: "ETH",
+          currency: "POL",
           description: "A test item update",
           title: "Test Item",
           photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
