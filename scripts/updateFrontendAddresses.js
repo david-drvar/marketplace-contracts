@@ -5,7 +5,7 @@ const fs = require("fs");
 const marketplaceAbiSource = require("../artifacts/contracts/Marketplace.sol/Marketplace.json");
 const usersAbiSource = require("../artifacts/contracts/Users.sol/Users.json");
 const escrowAbiSource = require("../artifacts/contracts/Escrow.sol/Escrow.json");
-const deployedAddresses = require("../ignition/deployments/chain-11155111/deployed_addresses.json");
+const deployedAddresses = require("../ignition/deployments/chain-80002/deployed_addresses.json");
 
 async function main() {
   if (process.env.UPDATE_FRONT_END) {

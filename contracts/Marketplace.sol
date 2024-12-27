@@ -117,7 +117,7 @@ interface IEscrow {
 
 
 error PriceMustBeAboveZero();
-error ItemNotListed(address sellerAddress, uint256 id);
+error ItemNotListed(uint256 id);
 error ItemNotBelongsToSeller(address sellerAddress, uint256 id);
 error SellerCannotBuyItsItem(address sellerAddress);
 error PhotoLimitExceeded();
@@ -165,9 +165,9 @@ contract Marketplace is Initializable, OwnableUpgradeable {
     uint8 constant public MAX_PHOTO_LIMIT = 3;
 
     uint256 itemCount;
-    mapping(address => mapping(uint256 => Item)) private items; //mapping seller address to mapping of id to Item
+    mapping(uint256 => Item) private items; //mapping of id to Item
     mapping(string => string[]) private categories; // mapping category name to list of subcategories
-    mapping(string => address) public supportedTokens; // mapping tokenName ("ETH", "USDC"...) to token contract address
+    mapping(string => address) public supportedTokens; // mapping tokenName ("POL", "USDC"...) to token contract address
 
     event ItemListed(uint256 indexed id, address indexed seller, string title, string description, uint256 price, string currency, string[] photosIPFSHashes, Condition condition,
         string category, string subcategory, string country, bool isGift);
@@ -196,21 +196,21 @@ contract Marketplace is Initializable, OwnableUpgradeable {
         categories["Collectibles"] = ["Coins", "Stamps", "Trading Cards", "Art", "Other"];
 
         // Initialize supported tokens
-        supportedTokens["ETH"] = address(this);
+        supportedTokens["POL"] = address(this);
     }
 
-    modifier isListed(address sellerAddress, uint256 id) {
-        if (items[sellerAddress][id].price < 0) {
-            revert ItemNotListed(sellerAddress, id);
+    modifier isListed(uint256 id) {
+        if (items[id].price < 0) {
+            revert ItemNotListed(id);
         }
-        else if (items[sellerAddress][id].itemStatus != ItemStatus.LISTED) {
-            revert ItemNotListed(sellerAddress, id);
+        else if (items[id].itemStatus != ItemStatus.LISTED) {
+            revert ItemNotListed(id);
         }
         _;
     }
 
     modifier belongsToSeller(address sellerAddress, uint256 id) {
-        if (items[sellerAddress][id].seller != sellerAddress) {
+        if (items[id].seller != sellerAddress) {
             revert ItemNotBelongsToSeller(sellerAddress, id);
         }
         _;
@@ -230,8 +230,8 @@ contract Marketplace is Initializable, OwnableUpgradeable {
         _;
     }
 
-    modifier notGift(address sellerAddress, uint256 id) {
-        if (items[sellerAddress][id].isGift) {
+    modifier notGift(uint256 id) {
+        if (items[id].isGift) {
             revert MustNotBeGift();
         }
         _;
@@ -319,29 +319,31 @@ contract Marketplace is Initializable, OwnableUpgradeable {
         isValidIPFSHashes(item.photosIPFSHashes)
         supportedToken(item.currency)
         userRegistered()
+        returns (uint256)
         {
-
-        finalizeListItem(item);
+        uint256 id = finalizeListItem(item);
+        return id;
     }
 
     function finalizeListItem(
         Item memory item
-    )   internal {
+    )   internal returns (uint256) {
     
         itemCount++;
         uint256 id = createHash(itemCount, msg.sender);
         if (item.isGift)
             item.price = 0;
 
-        items[msg.sender][id] = Item(id, msg.sender, item.price, item.currency,item.description, item.title, item.photosIPFSHashes, ItemStatus.LISTED, item.condition, item.category, item.subcategory, item.country, item.isGift);
+        items[id] = Item(id, msg.sender, item.price, item.currency,item.description, item.title, item.photosIPFSHashes, ItemStatus.LISTED, item.condition, item.category, item.subcategory, item.country, item.isGift);
         emit ItemListed(id, msg.sender, item.title, item.description, item.price, item.currency, item.photosIPFSHashes, item.condition, item.category, item.subcategory, item.country, item.isGift);
+        return id;
     }
 
     function updateItem(Item memory item) external
         belongsToSeller(msg.sender, item.id) 
         priceMustBeAboveOrEqualZero(item.price) 
         numberOfPhotosMustBeBelowLimit(item.photosIPFSHashes)
-        isListed(msg.sender, item.id) 
+        isListed(item.id) 
         isValidIPFSHashes(item.photosIPFSHashes)
         isValidCategoryAndSubcategory(item.category, item.subcategory)
         supportedToken(item.currency)
@@ -353,7 +355,7 @@ contract Marketplace is Initializable, OwnableUpgradeable {
     }
 
     function finalizeUpdateItem(Item memory item) internal {
-        items[msg.sender][item.id] = Item(item.id, msg.sender, item.price, item.currency,item.description, item.title, item.photosIPFSHashes,ItemStatus.LISTED, item.condition, item.category, item.subcategory, item.country, item.isGift);
+        items[item.id] = Item(item.id, msg.sender, item.price, item.currency,item.description, item.title, item.photosIPFSHashes,ItemStatus.LISTED, item.condition, item.category, item.subcategory, item.country, item.isGift);
         emit ItemUpdated(item.id, msg.sender, item.title, item.description, item.price, item.currency, item.photosIPFSHashes, item.condition, item.category, item.subcategory, item.country, item.isGift);
     }
 
@@ -382,77 +384,74 @@ contract Marketplace is Initializable, OwnableUpgradeable {
         return idHash;
     }
 
-    function deleteItem(uint256 id) isListed(msg.sender, id) external 
+    function deleteItem(uint256 id) isListed(id) external 
         belongsToSeller(msg.sender, id)  {
-        items[msg.sender][id].itemStatus = ItemStatus.DELETED;
+        items[id].itemStatus = ItemStatus.DELETED;
         emit ItemDeleted(id, msg.sender);
     }
 
-    function buyItem(address sellerAddress, uint256 id, address _moderator) external payable 
-        isListed(sellerAddress, id) 
-        belongsToSeller(sellerAddress, id) 
-        notSeller(sellerAddress, msg.sender) 
+    function buyItem(uint256 id, address _moderator) external payable 
+        isListed(id) 
+        notSeller(items[id].seller, msg.sender) 
         mustBeModerator(_moderator) 
-        notGift(sellerAddress, id)
+        notGift(id)
         userRegistered()
         {
-        if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) == keccak256(abi.encodePacked("ETH"))) {
-            require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
+        if (keccak256(abi.encodePacked(items[id].currency)) == keccak256(abi.encodePacked("POL"))) {
+            require(msg.value >= items[id].price, "Incorrect POL amount");
         }
         else {
             // check if buyer(sender) has allowed marketplace contract to transfer funds
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(this)) >= items[sellerAddress][id].price, "Insufficient allowance for marketplace contract");
+            require(IERC20(supportedTokens[items[id].currency]).allowance(msg.sender, address(this)) >= items[id].price, "Insufficient allowance for marketplace contract");
             
             // sender must have enough token balance on his address
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(msg.sender) >= items[sellerAddress][id].price, "Insufficient token balance");
+            require(IERC20(supportedTokens[items[id].currency]).balanceOf(msg.sender) >= items[id].price, "Insufficient token balance");
         }
-        finalizeBuyItem(sellerAddress, id, _moderator);
+        finalizeBuyItem(id, _moderator);
     }
 
-    function finalizeBuyItem(address sellerAddress, uint256 id, address _moderator) private 
-        moderatorCantBeBuyerOrSeller(_moderator, sellerAddress){
+    function finalizeBuyItem(uint256 id, address _moderator) private 
+        moderatorCantBeBuyerOrSeller(_moderator, items[id].seller){
             
         // transfer tokens to escrow address
-        if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) != keccak256(abi.encodePacked("ETH"))) {
-            bool success = IERC20(supportedTokens[items[sellerAddress][id].currency]).transferFrom(msg.sender, address(escrowContract), items[sellerAddress][id].price);
+        if (keccak256(abi.encodePacked(items[id].currency)) != keccak256(abi.encodePacked("POL"))) {
+            bool success = IERC20(supportedTokens[items[id].currency]).transferFrom(msg.sender, address(escrowContract), items[id].price);
             require(success, "Token transfer failed");
         }
 
         // create transaction
-        try escrowContract.createTransaction{value: msg.value}(id, sellerAddress, msg.sender,_moderator,items[sellerAddress][id].price,  items[sellerAddress][id].currency, usersContract.getProfile(_moderator).moderatorFee) {
-            items[sellerAddress][id].itemStatus = ItemStatus.BOUGHT;
-            emit ItemBought(id, sellerAddress, msg.sender);
+        try escrowContract.createTransaction{value: msg.value}(id, items[id].seller, msg.sender,_moderator,items[id].price,  items[id].currency, usersContract.getProfile(_moderator).moderatorFee) {
+            items[id].itemStatus = ItemStatus.BOUGHT;
+            emit ItemBought(id, items[id].seller, msg.sender);
         }
         catch {
             revert("Transaction creation failed");
         }
     }
 
-    function buyItemWithoutModerator(address sellerAddress, uint256 id) external payable 
-        isListed(sellerAddress, id) 
-        belongsToSeller(sellerAddress, id) 
-        notSeller(sellerAddress, msg.sender) 
+    function buyItemWithoutModerator(uint256 id) external payable 
+        isListed(id) 
+        notSeller(items[id].seller, msg.sender) 
         userRegistered()
         {
 
-        if (keccak256(abi.encodePacked(items[sellerAddress][id].currency)) == keccak256(abi.encodePacked("ETH"))) {
-            require(msg.value >= items[sellerAddress][id].price, "Incorrect ETH amount");
+        if (keccak256(abi.encodePacked(items[id].currency)) == keccak256(abi.encodePacked("POL"))) {
+            require(msg.value >= items[id].price, "Incorrect POL amount");
         }
         else {
             // check if buyer(sender) has allowed escrow contract to transfer funds
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).allowance(msg.sender, address(escrowContract)) >= items[sellerAddress][id].price, "Insufficient allowance for escrow contract");
+            require(IERC20(supportedTokens[items[id].currency]).allowance(msg.sender, address(escrowContract)) >= items[id].price, "Insufficient allowance for escrow contract");
             
             // sender must have enough token balance on his address
-            require(IERC20(supportedTokens[items[sellerAddress][id].currency]).balanceOf(msg.sender) >= items[sellerAddress][id].price, "Insufficient token balance");
+            require(IERC20(supportedTokens[items[id].currency]).balanceOf(msg.sender) >= items[id].price, "Insufficient token balance");
         }
-
-        finalizeBuyItemWithoutModerator(sellerAddress, id);
+        finalizeBuyItemWithoutModerator(id);
     }
 
-    function finalizeBuyItemWithoutModerator(address sellerAddress, uint256 id) private {
-        try escrowContract.createTransactionWithoutModerator{value: msg.value}(id, sellerAddress, msg.sender,items[sellerAddress][id].price, items[sellerAddress][id].currency) {
-            items[sellerAddress][id].itemStatus = ItemStatus.BOUGHT;
-            emit ItemBought(id, sellerAddress, msg.sender);
+    function finalizeBuyItemWithoutModerator(uint256 id) private {
+        try escrowContract.createTransactionWithoutModerator{value: msg.value}(id, items[id].seller, msg.sender,items[id].price, items[id].currency) {
+            items[id].itemStatus = ItemStatus.BOUGHT;
+            emit ItemBought(id, items[id].seller, msg.sender);
         }
         catch {
             revert("Transaction creation failed");

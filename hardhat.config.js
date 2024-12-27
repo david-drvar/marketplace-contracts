@@ -2,12 +2,14 @@ require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 require("@nomicfoundation/hardhat-verify");
 require("hardhat-interface-generator");
+require("hardhat-gas-reporter");
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR-API-KEY";
 const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "Your etherscan API key";
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "Your etherscan API key";
+const COIN_MARKET_CAP_API_KEY = process.env.COIN_MARKET_CAP_API_KEY || "Your coin market cap API key";
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -16,9 +18,18 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 500,
       },
     },
+  },
+  gasReporter: {
+    enabled: true,
+    currency: "EUR",
+    coinmarketcap: COIN_MARKET_CAP_API_KEY,
+    gasPriceApi: ETHERSCAN_API_KEY,
+    currencyDisplayPrecision: 3,
+    outputFile: "gas-report.txt",
+    token: "MATIC",
   },
   defaultNetwork: "hardhat",
   networks: {
@@ -47,14 +58,14 @@ module.exports = {
       polygonAmoy: POLYGONSCAN_API_KEY,
     },
     customChains: [
-      {
-        network: "sepolia",
-        chainId: 11155111,
-        urls: {
-          apiURL: "https://eth-sepolia.blockscout.com/api",
-          browserURL: "https://eth-sepolia.blockscout.com",
-        },
-      },
+      // {
+      //   network: "sepolia",
+      //   chainId: 11155111,
+      //   urls: {
+      //     apiURL: "https://eth-sepolia.blockscout.com/api",
+      //     browserURL: "https://eth-sepolia.blockscout.com",
+      //   },
+      // },
       {
         network: "polygonAmoy",
         chainId: 80002,

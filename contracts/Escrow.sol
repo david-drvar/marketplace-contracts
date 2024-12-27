@@ -200,7 +200,7 @@ contract Escrow is Initializable, OwnableUpgradeable {
         transferOwnership(initialOwner); // Set the owner explicitly
 
         // Initialize supported tokens
-        supportedTokens["ETH"] = address(this);
+        supportedTokens["POL"] = address(this);
     }
 
     function addSupportedToken(string memory tokenName, address tokenAddress) external onlyOwner {
@@ -362,7 +362,7 @@ contract Escrow is Initializable, OwnableUpgradeable {
             uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
             uint256 sellerAmount = transaction.price - moderatorFeeAmount;
 
-            if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+            if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("POL"))) {
                 // Transfer to moderator their cut
                 (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
                 require(successModerator, "Transfer to moderator failed");
@@ -392,7 +392,7 @@ contract Escrow is Initializable, OwnableUpgradeable {
         Transaction storage transaction = transactions[_itemId];
 
         // Transfer remaining amount to seller
-        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("POL"))) {
             (bool successSeller, ) = transaction.seller.call{value: transaction.price}(""); 
             require(successSeller, "Transfer to seller failed");
         } else {
@@ -427,7 +427,7 @@ contract Escrow is Initializable, OwnableUpgradeable {
         uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
         uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
 
-        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("ETH"))) {
+        if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("POL"))) {
             (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 
             require(successModerator, "Transfer to moderator failed");
 

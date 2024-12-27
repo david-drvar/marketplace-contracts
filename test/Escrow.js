@@ -137,7 +137,7 @@ describe("Escrow", function () {
       id,
       seller: ownerAddress,
       price: 1000000,
-      currency: "ETH",
+      currency: "POL",
       description: "A test item",
       title: "Test Item",
       photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -153,7 +153,7 @@ describe("Escrow", function () {
 
     await marketplace.listNewItem(item);
 
-    await marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).approve(newItemId)).to.not.be.reverted;
@@ -224,7 +224,7 @@ describe("Escrow", function () {
     await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
     await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
 
-    await marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).approve(newItemId)).to.not.be.reverted;
@@ -272,7 +272,7 @@ describe("Escrow", function () {
       id,
       seller: ownerAddress,
       price: 1000000,
-      currency: "ETH",
+      currency: "POL",
       description: "A test item",
       title: "Test Item",
       photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -288,7 +288,7 @@ describe("Escrow", function () {
 
     await marketplace.listNewItem(item);
 
-    await marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).raiseDispute(newItemId)).to.not.be.reverted;
@@ -365,7 +365,7 @@ describe("Escrow", function () {
     await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
     await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
 
-    await marketplace.connect(otherAccount).buyItem(ownerAddress, newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).raiseDispute(newItemId)).to.not.be.reverted;

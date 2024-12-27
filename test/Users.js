@@ -211,7 +211,7 @@ describe("Users", function () {
       id,
       seller: ownerAddress,
       price: 1000000,
-      currency: "ETH",
+      currency: "POL",
       description: "A test item",
       title: "Test Item",
       photosIPFSHashes: ["QmaHj5MvsAD1ytkuQKVvS5jHPBzREojpFCHwzSevdCapCn"],
@@ -227,7 +227,7 @@ describe("Users", function () {
 
     await marketplace.listNewItem(item);
 
-    await marketplace.connect(otherAccount).buyItemWithoutModerator(ownerAddress, newItemId, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItemWithoutModerator(newItemId, { value: 1000000 });
 
     expect(await users.connect(otherAccount).createReview(ownerAddress, newItemId, 3, "good seller")).to.not.be.reverted;
 
