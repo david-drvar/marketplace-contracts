@@ -397,30 +397,33 @@ contract Marketplace is Initializable, OwnableUpgradeable {
         notGift(id)
         userRegistered()
         {
+        uint8 moderatorFee = usersContract.getProfile(_moderator).moderatorFee;
+        uint256 totalCost = items[id].price + (items[id].price * moderatorFee) / 100;
+
         if (keccak256(abi.encodePacked(items[id].currency)) == keccak256(abi.encodePacked("POL"))) {
-            require(msg.value >= items[id].price, "Incorrect POL amount");
+            require(msg.value >= totalCost, "Incorrect POL amount");
         }
         else {
             // check if buyer(sender) has allowed marketplace contract to transfer funds
-            require(IERC20(supportedTokens[items[id].currency]).allowance(msg.sender, address(this)) >= items[id].price, "Insufficient allowance for marketplace contract");
+            require(IERC20(supportedTokens[items[id].currency]).allowance(msg.sender, address(this)) >= totalCost, "Insufficient allowance for marketplace contract");
             
             // sender must have enough token balance on his address
-            require(IERC20(supportedTokens[items[id].currency]).balanceOf(msg.sender) >= items[id].price, "Insufficient token balance");
+            require(IERC20(supportedTokens[items[id].currency]).balanceOf(msg.sender) >= totalCost, "Insufficient token balance");
         }
-        finalizeBuyItem(id, _moderator);
+        finalizeBuyItem(id, _moderator, moderatorFee, totalCost);
     }
 
-    function finalizeBuyItem(uint256 id, address _moderator) private 
+    function finalizeBuyItem(uint256 id, address _moderator, uint8 moderatorFee, uint256 totalCost) private 
         moderatorCantBeBuyerOrSeller(_moderator, items[id].seller){
             
         // transfer tokens to escrow address
         if (keccak256(abi.encodePacked(items[id].currency)) != keccak256(abi.encodePacked("POL"))) {
-            bool success = IERC20(supportedTokens[items[id].currency]).transferFrom(msg.sender, address(escrowContract), items[id].price);
+            bool success = IERC20(supportedTokens[items[id].currency]).transferFrom(msg.sender, address(escrowContract), totalCost);
             require(success, "Token transfer failed");
         }
 
         // create transaction
-        try escrowContract.createTransaction{value: msg.value}(id, items[id].seller, msg.sender,_moderator,items[id].price,  items[id].currency, usersContract.getProfile(_moderator).moderatorFee) {
+        try escrowContract.createTransaction{value: msg.value}(id, items[id].seller, msg.sender,_moderator,items[id].price,  items[id].currency, moderatorFee) {
             items[id].itemStatus = ItemStatus.BOUGHT;
             emit ItemBought(id, items[id].seller, msg.sender);
         }

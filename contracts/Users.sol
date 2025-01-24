@@ -123,7 +123,7 @@ contract Users is Initializable, OwnableUpgradeable {
     IEscrow public escrowContract;
 
 
-    uint8 public maxModeratorFee = 20;
+    uint8 public maxModeratorFee = 10;
 
     event UserRegistered(address indexed userAddress, string username, string firstName,
         string lastName, string country, string description, string email, string avatarHash, bool isModerator, uint8 moderatorFee);
@@ -166,7 +166,7 @@ contract Users is Initializable, OwnableUpgradeable {
     }
 
     function setMaxModeratorFee(uint8 newFee) public onlyOwner {
-        require(newFee <= 25, "Fee cannot exceed 25%");
+        require(newFee <= 10, "Fee cannot exceed 10%");
         maxModeratorFee = newFee;
     }
 

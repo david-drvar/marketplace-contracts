@@ -487,7 +487,7 @@ describe("Marketplace", function () {
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1100000 })).to.not.be.reverted;
       });
 
       it("Should not revert buy item with moderator and stablecoins", async function () {
@@ -543,13 +543,13 @@ describe("Marketplace", function () {
 
         const newItemId = await marketplace.connect(owner).listNewItem.staticCall(item);
 
-        await mockERC20.transfer(otherAccountAddress, 1000000);
-        await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
-        await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
+        await mockERC20.transfer(otherAccountAddress, 1100000);
+        await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1100000);
+        await mockERC20.connect(otherAccount).approve(escrowAddress, 1100000);
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.not.be.reverted;
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1100000 })).to.not.be.reverted;
       });
 
       it("Should revert buy item with moderator and stablecoins", async function () {
@@ -607,13 +607,13 @@ describe("Marketplace", function () {
 
         const newItemId = await marketplace.connect(owner).listNewItem.staticCall(item);
 
-        await mockERC20.transfer(otherAccountAddress, 1000000);
-        await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
-        await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
+        await mockERC20.transfer(otherAccountAddress, 1100000);
+        await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1100000);
+        await mockERC20.connect(otherAccount).approve(escrowAddress, 1100000);
 
         await marketplace.listNewItem(item);
 
-        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 })).to.be.revertedWith("Transaction creation failed");
+        await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1100000 })).to.be.revertedWith("Transaction creation failed");
       });
 
       it("Should not revert delete item", async function () {
