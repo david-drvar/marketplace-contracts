@@ -251,7 +251,7 @@ contract Escrow is Initializable, OwnableUpgradeable {
     }
 
     modifier correctValueDistribution(uint256 itemId, uint8 percentageSeller, uint8 percentageBuyer) {
-        if (transactions[itemId].moderatorFee + percentageSeller + percentageBuyer != 100) {
+        if (percentageSeller + percentageBuyer != 100) {
             revert ValueDistributionNotCorrect();
         }
         _;
@@ -356,11 +356,13 @@ contract Escrow is Initializable, OwnableUpgradeable {
     function finalizeTransaction(uint256 _itemId) internal {
         Transaction storage transaction = transactions[_itemId];
 
+        require(!transaction.isCompleted, "Transaction already completed");
+
         if (transaction.buyerApproved && transaction.sellerApproved) {
             transaction.isCompleted = true;
 
             uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
-            uint256 sellerAmount = transaction.price - moderatorFeeAmount;
+            uint256 sellerAmount = transaction.price;
 
             if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("POL"))) {
                 // Transfer to moderator their cut
@@ -423,9 +425,10 @@ contract Escrow is Initializable, OwnableUpgradeable {
         transaction.isCompleted = true;
 
         uint256 moderatorFeeAmount = (transaction.price * transaction.moderatorFee) / 100;
-        uint256 remainingAmount = transaction.price - moderatorFeeAmount;
-        uint256 sellerAmount = (remainingAmount * percentageSeller) / 100;
-        uint256 buyerAmount = (remainingAmount * percentageBuyer) / 100;
+
+        // full item price is distributed between seller and buyer
+        uint256 sellerAmount = (transaction.price * percentageSeller) / 100;
+        uint256 buyerAmount = (transaction.price * percentageBuyer) / 100;
 
         if (keccak256(abi.encodePacked(transaction.currency)) == keccak256(abi.encodePacked("POL"))) {
             (bool successModerator, ) = transaction.moderator.call{value: moderatorFeeAmount}(""); 

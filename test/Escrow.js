@@ -153,18 +153,13 @@ describe("Escrow", function () {
 
     await marketplace.listNewItem(item);
 
-    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1100000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).approve(newItemId)).to.not.be.reverted;
   });
 
   it("should finalize transaction with stablecoins after two approvals", async function () {
-    // steps
-    // list item
-    // buy item with moderator
-    // approve 2 times
-
     const { marketplace, owner, users, otherAccount, escrow, moderatorAcc, mockERC20 } = await loadFixture(deployEscrowFixture);
     const id = 1;
     const ownerAddress = await owner.getAddress();
@@ -220,11 +215,11 @@ describe("Escrow", function () {
     await marketplace.listNewItem(item);
 
     // approve stablecoin spendings
-    await mockERC20.transfer(otherAccountAddress, 1000000);
-    await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
-    await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
+    await mockERC20.transfer(otherAccountAddress, 1100000);
+    await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1100000);
+    await mockERC20.connect(otherAccount).approve(escrowAddress, 1100000);
 
-    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
+    await expect(marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc)).to.not.be.reverted;
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).approve(newItemId)).to.not.be.reverted;
@@ -288,14 +283,14 @@ describe("Escrow", function () {
 
     await marketplace.listNewItem(item);
 
-    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1100000 });
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).raiseDispute(newItemId)).to.not.be.reverted;
 
     // finalize by moderator
     await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 20, 30)).to.be.revertedWithCustomError(escrow, "ValueDistributionNotCorrect");
-    await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 80, 10)).to.not.be.reverted;
+    await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 80, 20)).to.not.be.reverted;
   });
 
   it("should finalize transaction by moderator after approval and dispute with stablecoins", async function () {
@@ -361,17 +356,17 @@ describe("Escrow", function () {
     await marketplace.listNewItem(item);
 
     // approve stablecoin spendings
-    await mockERC20.transfer(otherAccountAddress, 1000000);
-    await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1000000);
-    await mockERC20.connect(otherAccount).approve(escrowAddress, 1000000);
+    await mockERC20.transfer(otherAccountAddress, 1100000);
+    await mockERC20.connect(otherAccount).approve(marketplaceAddress, 1100000);
+    await mockERC20.connect(otherAccount).approve(escrowAddress, 1100000);
 
-    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc, { value: 1000000 });
+    await marketplace.connect(otherAccount).buyItem(newItemId, moderatorAcc);
 
     await expect(escrow.connect(otherAccount).approve(newItemId)).to.not.be.reverted;
     await expect(escrow.connect(owner).raiseDispute(newItemId)).to.not.be.reverted;
 
     // finalize by moderator
     await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 20, 30)).to.be.revertedWithCustomError(escrow, "ValueDistributionNotCorrect");
-    await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 80, 10)).to.not.be.reverted;
+    await expect(escrow.connect(moderatorAcc).finalizeTransactionByModerator(newItemId, 80, 20)).to.not.be.reverted;
   });
 });

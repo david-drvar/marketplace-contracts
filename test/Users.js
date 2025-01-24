@@ -94,7 +94,7 @@ describe("Users", function () {
 
   it("check deployment valid", async function () {
     const { users } = await loadFixture(deployUsersFixture);
-    expect(await users.maxModeratorFee()).to.be.equal(20);
+    expect(await users.maxModeratorFee()).to.be.equal(10);
   });
 
   it("should allow profile update", async function () {
@@ -145,9 +145,9 @@ describe("Users", function () {
   it("should set moderator max fee only owner", async function () {
     const { users } = await loadFixture(deployUsersFixture);
 
-    await users.setMaxModeratorFee(15);
+    await users.setMaxModeratorFee(5);
 
-    expect(await users.maxModeratorFee()).to.be.equal(15);
+    expect(await users.maxModeratorFee()).to.be.equal(5);
   });
 
   it("should check user registered", async function () {
